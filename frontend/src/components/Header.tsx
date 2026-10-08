@@ -2,72 +2,55 @@
 
 import React from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 
 interface HeaderProps {
   onToggleSidebar?: () => void;
 }
 
-export default function Header({ onToggleSidebar }: HeaderProps) {
-  const { user, userProfile } = useAuth();
+const pageTitles: Record<string, string> = {
+  "/student": "Student dashboard",
+  "/alumni": "Alumni dashboard",
+  "/admin": "Admin overview",
+  "/directory": "Alumni directory",
+  "/jobs": "Career hub",
+  "/events": "University events",
+  "/profile": "My profile",
+};
 
-  const displayName = userProfile?.displayName || user?.displayName || user?.email?.split("@")[0] || "User";
-  const userPhoto = userProfile?.photoURL || user?.photoURL || "";
-  const userInitial = displayName.charAt(0).toUpperCase();
+export default function Header({ onToggleSidebar }: HeaderProps) {
+  const pathname = usePathname();
+  const { user, userProfile } = useAuth();
+  const displayName = userProfile?.displayName || user?.displayName || "Profile";
+  const photo = userProfile?.photoURL || user?.photoURL || "";
+  const title = pageTitles[pathname] || (pathname === "/home" ? "Community home" : "VSITR Alumni Portal");
 
   return (
-    <header className="fixed top-0 w-full z-50 bg-surface/80 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,32,69,0.05)] pt-safe">
-      <div className="max-w-[1280px] mx-auto h-16 px-4 md:px-12 flex items-center justify-between">
-        <div className="flex items-center gap-2">
+    <header className="fixed inset-x-0 top-0 z-30 h-16 border-b border-[#dce4e6] bg-white/95 backdrop-blur lg:left-[258px]">
+      <div className="flex h-full items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+        <div className="flex min-w-0 items-center gap-3">
           <button
+            type="button"
             onClick={onToggleSidebar}
-            className="w-11 h-11 flex items-center justify-center text-primary rounded-full hover:bg-surface-container transition-colors active:scale-95 cursor-pointer"
-            aria-label="Menu"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-[#213e49] hover:bg-[#edf2f3] lg:hidden"
+            aria-label="Open navigation"
           >
             <span className="material-symbols-outlined">menu</span>
           </button>
-          
-          <Link href="/home" className="flex items-center gap-2">
-            <div className="h-8 w-auto flex items-center gap-2 font-display text-lg font-bold text-primary animate-fade-in">
-              <div className="w-7 h-7 rounded bg-surface-container-lowest shadow-sm flex items-center justify-center p-0.5 overflow-hidden border border-surface-variant/30">
-                <img
-                  alt="VSITR Logo"
-                  className="w-full h-full object-contain"
-                  src="/app_logo.png"
-                />
-              </div>
-              <span>VSITR</span>
-            </div>
-          </Link>
+          <div className="min-w-0">
+            <p className="hidden text-[10px] font-bold uppercase tracking-[0.14em] text-[#657880] sm:block">VSITR Alumni Portal</p>
+            <h1 className="truncate text-sm font-semibold text-[#152e38] sm:mt-0.5">{title}</h1>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2.5">
-          {userProfile?.role === "admin" && (
-            <Link
-              href="/admin"
-              className="bg-primary/10 text-primary hover:bg-primary hover:text-on-primary transition-all px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 border border-primary/20"
-            >
-              <span className="material-symbols-outlined text-[16px]">admin_panel_settings</span>
-              <span className="hidden sm:inline">Admin Panel</span>
-            </Link>
-          )}
-          {userProfile?.role === "alumni" && (
-            <Link
-              href="/alumni"
-              className="bg-primary/10 text-primary hover:bg-primary hover:text-on-primary transition-all px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 border border-primary/20"
-            >
-              <span className="material-symbols-outlined text-[16px]">badge</span>
-              <span className="hidden sm:inline">Alumni Dashboard</span>
-            </Link>
-          )}
-          <Link href="/profile" title={displayName}>
-            <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center hover:bg-primary/90 transition-colors cursor-pointer text-on-primary font-bold text-sm shadow-sm overflow-hidden">
-              {userPhoto ? (
-                <img src={userPhoto} alt={displayName} className="w-full h-full object-cover" />
-              ) : (
-                <span>{userInitial}</span>
-              )}
-            </div>
+        <div className="flex shrink-0 items-center gap-3">
+          <span className="hidden text-right sm:block">
+            <span className="block max-w-44 truncate text-xs font-semibold text-[#213e49]">{displayName}</span>
+            <span className="block text-[10px] capitalize text-[#71838a]">{userProfile?.role || "Member"}</span>
+          </span>
+          <Link href="/profile" aria-label="Open profile" title={displayName} className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-[#d7e1e4] bg-[#dcece8] text-sm font-bold text-[#174844]">
+            {photo ? <img src={photo} alt="" className="h-full w-full object-cover" /> : displayName.slice(0, 1).toUpperCase()}
           </Link>
         </div>
       </div>

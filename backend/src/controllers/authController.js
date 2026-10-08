@@ -1,19 +1,28 @@
-import { db, inMemoryDb } from "../config/db.js";
+import { db } from "../config/db.js";
+import { config } from "../config/env.js";
 
-// Helper to generate a session token
-function generateToken(user) {
-  const payload = {
-    uid: user.uid,
-    email: user.email,
-    timestamp: Date.now(),
-  };
-  return Buffer.from(JSON.stringify(payload)).toString("base64");
+async function firebaseIdentity(action, payload) {
+  const response = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:${action}?key=${config.firebaseWebApiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...payload, returnSecureToken: true }),
+    }
+  );
+  const result = await response.json();
+  if (!response.ok) {
+    const error = new Error(result.error?.message || "Firebase Authentication failed");
+    error.status = response.status;
+    throw error;
+  }
+  return result;
 }
 
 // POST /api/auth/register
 export async function register(req, res) {
   try {
-    const { email, password, displayName, role, department, classYear } = req.body;
+    const { email, password, displayName, role = "student", department, classYear } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({
@@ -28,26 +37,20 @@ export async function register(req, res) {
         message: "Password must be at least 6 characters long",
       });
     }
-
-    // Check if user already exists
-    const usersSnapshot = await db.collection("users").get();
-    const existing = usersSnapshot.docs.find(
-      (d) => d.data()?.email?.toLowerCase() === email.toLowerCase()
-    );
-
-    if (existing) {
-      return res.status(409).json({
+    if (!["student", "alumni"].includes(role)) {
+      return res.status(403).json({
         success: false,
-        message: "An account with this email already exists",
+        message: "Admin accounts can only be created by an existing administrator",
       });
     }
 
-    const uid = `usr-${Date.now()}`;
+    const identity = await firebaseIdentity("signUp", { email, password });
+    const uid = identity.localId;
     const newUser = {
       uid,
       email: email.toLowerCase(),
       displayName: displayName || email.split("@")[0],
-      role: role || "student",
+      role,
       department: department || "",
       classYear: classYear || "",
       photoURL: "",
@@ -57,16 +60,14 @@ export async function register(req, res) {
     };
 
     await db.collection("users").doc(uid).set(newUser);
-    const token = generateToken(newUser);
-
     res.status(201).json({
       success: true,
       message: "User registered successfully",
-      token,
+      token: identity.idToken,
       user: newUser,
     });
   } catch (error) {
-    res.status(500).json({
+    res.status(error.status || 500).json({
       success: false,
       message: "Registration failed",
       error: error.message,
@@ -86,29 +87,21 @@ export async function login(req, res) {
       });
     }
 
-    const usersSnapshot = await db.collection("users").get();
-    const foundDoc = usersSnapshot.docs.find(
-      (d) => d.data()?.email?.toLowerCase() === email.toLowerCase()
-    );
-
-    if (!foundDoc) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid email or password",
-      });
+    const identity = await firebaseIdentity("signInWithPassword", { email, password });
+    const profile = await db.collection("users").doc(identity.localId).get();
+    if (!profile.exists) {
+      return res.status(403).json({ success: false, message: "Account profile is not registered" });
     }
-
-    const userData = foundDoc.data();
-    const token = generateToken(userData);
+    const userData = profile.data();
 
     res.json({
       success: true,
       message: "Signed in successfully",
-      token,
+      token: identity.idToken,
       user: userData,
     });
   } catch (error) {
-    res.status(500).json({
+    res.status(error.status || 500).json({
       success: false,
       message: "Sign in failed",
       error: error.message,
@@ -142,33 +135,10 @@ export async function getMe(req, res) {
 // POST /api/auth/verify
 export async function verifyToken(req, res) {
   try {
-    const { token } = req.body;
-    if (!token) {
-      return res.status(400).json({
-        success: false,
-        message: "Token is required for verification",
-      });
-    }
-
-    let uid = token;
-    try {
-      const parsed = JSON.parse(Buffer.from(token, "base64").toString("utf8"));
-      if (parsed?.uid) uid = parsed.uid;
-    } catch (e) {}
-
-    const doc = await db.collection("users").doc(uid).get();
-    if (!doc.exists) {
-      return res.status(401).json({
-        success: false,
-        valid: false,
-        message: "Token is invalid or expired",
-      });
-    }
-
     res.json({
       success: true,
       valid: true,
-      user: doc.data(),
+      user: req.user,
     });
   } catch (error) {
     res.status(500).json({

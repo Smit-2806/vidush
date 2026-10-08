@@ -58,172 +58,58 @@ export default function DirectoryPage() {
 
   return (
     <LayoutWrapper>
-      <div className="flex flex-col w-full px-4 gap-6 mt-4 pb-16">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="mx-auto w-full max-w-[1440px] space-y-7">
+        <header className="flex flex-col justify-between gap-5 border-b border-[#d9e2e3] pb-6 md:flex-row md:items-end">
           <div>
-            <h1 className="font-headline-lg-mobile text-headline-lg-mobile text-on-surface">
-              Alumni Directory
-            </h1>
-            <p className="font-body-md text-on-surface-variant mt-1">
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#54766f]">Community <span className="px-1.5 text-[#a1b2b0]">/</span> Directory</p>
+            <h1 className="mt-2 font-sans text-3xl font-semibold tracking-tight text-[#142f38] sm:text-4xl">Alumni network</h1>
+            <p className="mt-2 text-sm text-[#63777d]">
               Connect with graduates, network with industry professionals, and find mentors.
             </p>
           </div>
-        </div>
+          <p className="text-sm font-medium text-[#60767b]">{filteredAlumni.length} <span className="text-[#8a9a9d]">of</span> {alumni.length} members</p>
+        </header>
 
-        {/* Search Input */}
-        <div className="relative w-full shadow-sm rounded-full overflow-hidden bg-surface-container-lowest focus-within:shadow-md transition-shadow">
-          <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-on-surface-variant">
-            <span className="material-symbols-outlined text-[20px]">search</span>
-          </div>
-          <input
-            className="w-full bg-transparent h-12 pl-12 pr-4 outline-none font-body-md text-on-background placeholder:text-on-surface-variant/70"
-            placeholder="Search by name, company, role, or skills..."
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
-
-        {/* Filters Scroll Area */}
-        <div className="w-full overflow-x-auto scrollbar-hide -mx-4 px-4 pb-2 snap-x">
-          <div className="flex items-center gap-2 w-max pb-1">
-            <button
-              onClick={() => {
-                setSearchQuery("");
-                setSelectedDepartment("All");
-                setSelectedRole("all");
-              }}
-              className={`snap-start shrink-0 flex items-center justify-center gap-1.5 font-label-md px-4 py-2 rounded-full shadow-sm transition-colors active:scale-95 cursor-pointer ${
-                searchQuery || selectedDepartment !== "All" || selectedRole !== "all"
-                  ? "bg-primary text-on-primary"
-                  : "bg-surface-container text-on-surface hover:bg-surface-container-high"
-              }`}
-            >
-              <span className="material-symbols-outlined text-[16px]">tune</span>
-              Reset Filters
-            </button>
-
-            {departments.length > 1 && (
-              <div className="relative snap-start shrink-0">
-                <select
-                  value={selectedDepartment}
-                  onChange={(e) => setSelectedDepartment(e.target.value)}
-                  className="appearance-none bg-surface-container text-on-surface font-label-md pl-4 pr-8 py-2 rounded-full hover:bg-surface-container-high transition-colors shadow-sm outline-none cursor-pointer"
-                >
-                  <option value="All">Department: All</option>
-                  {departments
-                    .filter((d) => d !== "All")
-                    .map((dept) => (
-                      <option key={dept} value={dept}>
-                        {dept}
-                      </option>
-                    ))}
-                </select>
-                <span className="material-symbols-outlined text-[16px] absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                  arrow_drop_down
-                </span>
-              </div>
-            )}
+        <div className="grid gap-3 border-b border-[#d9e2e3] pb-5 md:grid-cols-[minmax(240px,1fr)_auto_auto] md:items-center">
+          <label className="relative block">
+            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[19px] text-[#72868a]">search</span>
+            <input className="min-h-11 w-full rounded-md border border-[#cbd8d9] bg-white pl-10 pr-4 text-sm text-[#18343c] outline-none placeholder:text-[#879599] focus:border-[#458a7c] focus:ring-2 focus:ring-[#458a7c]/20" placeholder="Search people, companies, skills…" type="search" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+          </label>
+          {departments.length > 1 && <select aria-label="Filter by department" value={selectedDepartment} onChange={(e) => setSelectedDepartment(e.target.value)} className="min-h-11 rounded-md border border-[#cbd8d9] bg-white px-3 text-sm text-[#29474e] outline-none focus:border-[#458a7c]"><option value="All">All departments</option>{departments.filter((department) => department !== "All").map((department) => <option key={department} value={department}>{department}</option>)}</select>}
+          <div className="flex min-h-11 items-center gap-1 border-b border-[#cbd8d9] md:border-0" role="group" aria-label="Filter alumni">
+            {(["all", "mentor", "verified"] as const).map((role) => <button key={role} type="button" onClick={() => setSelectedRole(role)} aria-pressed={selectedRole === role} className={`min-h-10 flex-1 px-3 text-xs font-semibold capitalize transition ${selectedRole === role ? "border-b-2 border-[#24635d] text-[#205b55]" : "text-[#74868b] hover:text-[#24444b]"}`}>{role === "all" ? "Everyone" : role === "mentor" ? "Mentors" : "Verified"}</button>)}
           </div>
         </div>
 
-        {/* Alumni List / Cards */}
         {alumni.length === 0 ? (
-          <div className="text-center py-16 bg-surface-container-lowest rounded-2xl shadow-sm border border-dashed border-outline-variant/30 mt-4 flex flex-col items-center justify-center p-6">
-            <span className="material-symbols-outlined text-[48px] text-outline opacity-40">people_outline</span>
-            <p className="font-headline-md text-on-surface mt-2 font-bold">No Alumni Listed Yet</p>
-            <p className="font-body-sm text-on-surface-variant mt-1 max-w-sm">
-              The alumni directory is currently empty. Registered alumni members will appear here.
-            </p>
+          <div className="border-y border-dashed border-[#cbd8d9] py-16 text-center">
+            <span className="material-symbols-outlined text-3xl text-[#829398]">groups</span>
+            <p className="mt-2 text-sm font-semibold text-[#29474e]">{isLoading ? "Loading alumni…" : "No alumni profiles yet"}</p>
+            <p className="mt-1 text-xs text-[#819095]">Registered alumni will appear in this directory.</p>
           </div>
         ) : (
-          <div className="flex flex-col gap-4">
-            <div className="flex justify-between items-center text-on-surface-variant text-xs px-1">
-              <span>Showing {filteredAlumni.length} alumni</span>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div>
+            {filteredAlumni.length ? <div className="divide-y divide-[#dfe7e7] border-y border-[#d9e2e3]">
               {filteredAlumni.map((alumnus) => {
                 const initial = alumnus.name?.charAt(0).toUpperCase() || "A";
                 return (
-                  <div
-                    key={alumnus.id}
-                    className="bg-surface-container-lowest rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between border border-surface-container group"
-                  >
-                    <div>
-                      <div className="flex items-start gap-4">
-                        <div className="w-14 h-14 rounded-full overflow-hidden shrink-0 border-2 border-primary/10 bg-primary/10 flex items-center justify-center text-primary text-xl font-bold">
-                          {alumnus.avatarUrl ? (
-                            <img
-                              className="w-full h-full object-cover"
-                              src={alumnus.avatarUrl}
-                              alt={alumnus.name}
-                            />
-                          ) : (
-                            <span>{initial}</span>
-                          )}
-                        </div>
-                        
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-1">
-                            <h3 className="font-headline-md text-on-surface truncate group-hover:text-primary transition-colors text-base font-bold">
-                              {alumnus.name}
-                            </h3>
-                            {alumnus.isMentor && (
-                              <span className="shrink-0 bg-secondary-container/20 text-on-secondary-container font-label-sm px-2 py-0.5 rounded-full flex items-center gap-0.5 text-[10px] font-bold">
-                                Mentor
-                              </span>
-                            )}
-                          </div>
-                          <p className="font-body-sm text-on-surface-variant truncate text-xs mt-0.5">
-                            {alumnus.classYear} • {alumnus.department}
-                          </p>
-                          <div className="flex items-center gap-1.5 mt-1 text-on-surface text-xs">
-                            <span className="material-symbols-outlined text-[14px] text-primary">work</span>
-                            <p className="truncate font-medium">
-                              {alumnus.role} at <span className="font-bold">{alumnus.company}</span>
-                            </p>
-                          </div>
-                          {alumnus.email && (
-                            <div className="flex items-center gap-1.5 mt-1 text-on-surface-variant text-[11px]">
-                              <span className="material-symbols-outlined text-[13px] text-primary">mail</span>
-                              <span className="truncate">{alumnus.email}</span>
-                            </div>
-                          )}
-                        </div>
+                  <article key={alumnus.id} className="grid gap-3 py-4 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_auto] sm:items-center sm:gap-5">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#dcebe5] text-sm font-semibold text-[#27564e]">{alumnus.avatarUrl ? <img src={alumnus.avatarUrl} alt="" className="h-full w-full object-cover" /> : initial}</span>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2"><h2 className="truncate text-sm font-semibold text-[#17343b]">{alumnus.name}</h2>{alumnus.isMentor && <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-[#a45d37]">Mentor</span>}</div>
+                        <p className="mt-1 truncate text-xs text-[#718287]">{alumnus.classYear} <span className="px-1">·</span> {alumnus.department}</p>
                       </div>
-
-                      {alumnus.skills && alumnus.skills.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 mt-3">
-                          {alumnus.skills.map((skill) => (
-                            <span
-                              key={skill}
-                              className="bg-surface-container-low text-on-surface font-label-sm px-2.5 py-0.5 rounded-full text-[11px]"
-                            >
-                              {skill}
-                            </span>
-                          ))}
-                        </div>
-                      )}
                     </div>
-
-                    <div className="flex gap-2 mt-4 pt-3 border-t border-surface-container-low">
-                      <a
-                        href={
-                          alumnus.email
-                            ? `mailto:${alumnus.email}?subject=${encodeURIComponent(`Connecting via Alumni Portal - ${alumnus.name}`)}&body=${encodeURIComponent(`Hi ${alumnus.name},\n\nI found your profile on the Alumni Directory and would love to connect with you regarding your experience at ${alumnus.company}.\n\nBest regards,`)}`
-                            : `mailto:alumni@alumniportal.com?subject=${encodeURIComponent(`Inquiry to connect with ${alumnus.name}`)}`
-                        }
-                        className="flex-1 bg-primary text-on-primary hover:bg-primary/95 transition-colors font-label-md py-2 rounded-lg text-center font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer no-underline"
-                      >
-                        <span className="material-symbols-outlined text-[16px]">mail</span>
-                        Connect
-                      </a>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm text-[#29474e]">{alumnus.role} <span className="text-[#879599">at</span> {alumnus.company}</p>
+                      {alumnus.skills?.length > 0 && <p className="mt-1 truncate text-xs text-[#829196]">{alumnus.skills.slice(0, 3).join(" · ")}</p>}
                     </div>
-                  </div>
+                    <a href={alumnus.email ? `mailto:${alumnus.email}?subject=${encodeURIComponent(`Connecting via Alumni Portal - ${alumnus.name}`)}&body=${encodeURIComponent(`Hi ${alumnus.name},\n\nI found your profile on the Alumni Directory and would love to connect with you regarding your experience at ${alumnus.company}.\n\nBest regards,`)}` : `mailto:alumni@alumniportal.com?subject=${encodeURIComponent(`Inquiry to connect with ${alumnus.name}`)}`} className="inline-flex min-h-9 items-center gap-1.5 justify-self-start rounded-md border border-[#cbd8d9] px-3 text-xs font-semibold text-[#245e58] transition hover:bg-[#e8f1ee] sm:justify-self-end"><span className="material-symbols-outlined text-[16px]">mail</span>Connect</a>
+                  </article>
                 );
               })}
-            </div>
+            </div> : <div className="border-y border-[#d9e2e3] py-12 text-center text-sm text-[#718287]">No alumni match those filters.</div>}
           </div>
         )}
       </div>

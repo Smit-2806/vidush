@@ -68,15 +68,7 @@ export async function getJobById(req, res) {
 // POST /api/jobs
 export async function createJob(req, res) {
   try {
-    const { title, company, location, type, level, referral, featured, deadline, postedBy, postedByName, postedByEmail } = req.body;
-
-    const userRole = req.body.userRole || req.body.role || req.headers["x-user-role"];
-    if (userRole && userRole !== "alumni" && userRole !== "admin") {
-      return res.status(403).json({
-        success: false,
-        message: "Forbidden: Only verified alumni members are authorized to post jobs",
-      });
-    }
+    const { title, company, location, type, level, referral, featured, deadline } = req.body;
 
     if (!title || !company || !location) {
       return res.status(400).json({
@@ -97,9 +89,9 @@ export async function createJob(req, res) {
       postedDate: "Just now",
       logoColorClass: "bg-surface-container",
       logoText: company.slice(0, 2).toUpperCase(),
-      postedBy: postedBy || "",
-      postedByName: postedByName || "",
-      postedByEmail: postedByEmail || "",
+      postedBy: req.user.uid,
+      postedByName: req.user.displayName || "Alumni Member",
+      postedByEmail: req.user.email || "",
       createdAt: new Date().toISOString(),
     };
 

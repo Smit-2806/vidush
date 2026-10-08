@@ -10,9 +10,23 @@ export interface EventItem {
   title: string;
   month: string;
   day: string;
+  date?: string;
   location: string;
+  description?: string;
+  status?: "live" | "completed";
   isVirtual: boolean;
   imageUrl: string;
+  createdAt?: any;
+}
+
+export interface EventRegistration {
+  id: string;
+  eventId: string;
+  eventTitle: string;
+  studentUid: string;
+  studentName: string;
+  studentEmail: string;
+  status: "registered";
   createdAt?: any;
 }
 

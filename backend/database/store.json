@@ -62,7 +62,6 @@
       "updatedAt": "2026-10-06T18:32:08.000Z"
     },
     "test-uid-123": {
-      "currentPassword": "UpdatedPassword789!",
       "updatedAt": "2026-10-06T18:46:57.389Z",
       "uid": "test-uid-123"
     },
@@ -76,7 +75,7 @@
       "company": "TCS",
       "photoURL": "http://localhost:5000/uploads/avatar-1791318683791-130107504.jpg",
       "bio": "Good student",
-      "updatedAt": "2026-10-06T20:31:25.942Z"
+      "updatedAt": "2026-10-08T19:44:30.203Z"
     },
     "RscIvWqmbdgK4wpmCNktCdJjwUn2": {
       "uid": "RscIvWqmbdgK4wpmCNktCdJjwUn2",
@@ -101,6 +100,34 @@
       "photoURL": "",
       "bio": "Proud Alumnus",
       "updatedAt": "2026-10-07T17:16:39.475Z"
+    },
+    "nXDhj6epm5PQKkENC3qxHr9dAjv2": {
+      "uid": "nXDhj6epm5PQKkENC3qxHr9dAjv2",
+      "email": "jaymeenvaghela07@gmail.com",
+      "displayName": "JAYMEEN",
+      "role": "student",
+      "photoURL": "",
+      "updatedAt": "2026-10-08T19:38:53.269Z"
+    },
+    "uFiFxgT5gtZyFRA4NzzEG5vy9rF3": {
+      "uid": "uFiFxgT5gtZyFRA4NzzEG5vy9rF3",
+      "email": "mastermeet@gmail.com",
+      "displayName": "Meet Master",
+      "role": "admin",
+      "photoURL": "",
+      "updatedAt": "2026-10-08T19:20:54.813Z"
+    },
+    "MApWXk6CDwPUfjBBCO3ALYW0F0T2": {
+      "uid": "MApWXk6CDwPUfjBBCO3ALYW0F0T2",
+      "email": "mastermeet67@gmail.com",
+      "displayName": "Meet Master",
+      "role": "admin",
+      "classYear": "",
+      "department": "",
+      "company": "",
+      "photoURL": "",
+      "bio": "",
+      "updatedAt": "2026-10-08T19:42:46.229Z"
     }
   },
   "applications": [

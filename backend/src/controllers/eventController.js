@@ -57,14 +57,6 @@ export async function createEvent(req, res) {
   try {
     const { title, month, day, date, location, isVirtual, imageUrl, description } = req.body;
 
-    const userRole = req.body.userRole || req.body.role || req.headers["x-user-role"];
-    if (userRole && userRole !== "admin") {
-      return res.status(403).json({
-        success: false,
-        message: "Forbidden: Only portal administrators are authorized to host events",
-      });
-    }
-
     if (!title || !location) {
       return res.status(400).json({
         success: false,
@@ -93,9 +85,12 @@ export async function createEvent(req, res) {
       title,
       month: finalMonth,
       day: finalDay,
+      date: date || "",
+      status: "live",
       location,
       description: description || "",
       isVirtual: Boolean(isVirtual),
+      createdBy: req.user.uid,
       imageUrl: imageUrl || "https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&q=80&w=400",
       createdAt: new Date().toISOString(),
     };

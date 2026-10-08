@@ -4,9 +4,11 @@ import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import LayoutWrapper from "@/components/LayoutWrapper";
 import { useAuth } from "@/context/AuthContext";
+import { Job } from "@/data/mockData";
 import { UserProfileData } from "@/lib/firestore";
 import {
   fetchAllUsers,
+  fetchJobs,
   adminEnrollMember,
   updateUserViaApi,
   deleteUserViaApi,
@@ -17,6 +19,7 @@ export default function AdminDashboardPage() {
   const { user, userProfile, loading: authLoading } = useAuth();
 
   const [members, setMembers] = useState<UserProfileData[]>([]);
+  const [alumniJobs, setAlumniJobs] = useState<Job[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedRoleFilter, setSelectedRoleFilter] = useState<"all" | "student" | "alumni">("all");
@@ -52,7 +55,6 @@ export default function AdminDashboardPage() {
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [passwordTargetMember, setPasswordTargetMember] = useState<UserProfileData | null>(null);
   const [newPasswordInput, setNewPasswordInput] = useState("");
-  const [showStoredPassword, setShowStoredPassword] = useState(false);
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
 
   // Delete Confirmation state (Delete)
@@ -60,24 +62,15 @@ export default function AdminDashboardPage() {
   const [deletingMember, setDeletingMember] = useState<UserProfileData | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Load all members
-  const loadMembers = async () => {
-    setIsLoading(true);
-    try {
-      const data = await fetchAllUsers();
-      setMembers(data);
-    } catch (err: any) {
-      console.error("Failed to load members:", err);
-      setFeedback({ type: "error", message: "Failed to load members from database." });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   useEffect(() => {
-    if (!authLoading && user) {
-      loadMembers();
-    }
+    if (authLoading || !user) return;
+    fetchAllUsers()
+      .then(setMembers)
+      .catch(() => setFeedback({ type: "error", message: "Failed to load members from database." }))
+      .finally(() => setIsLoading(false));
+    fetchJobs()
+      .then((jobs) => setAlumniJobs(jobs.filter((job) => job.postedBy || job.postedByEmail).slice(0, 5)))
+      .catch((err) => console.error("Failed to load alumni job postings:", err));
   }, [authLoading, user]);
 
   // Derived statistics
@@ -140,11 +133,11 @@ export default function AdminDashboardPage() {
       setEnrollPassword("");
       setEnrollCompany("");
       setEnrollBio("");
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Enrollment error:", err);
       setFeedback({
         type: "error",
-        message: err.message || "Failed to enroll member. Check if email already exists.",
+        message: err instanceof Error ? err.message : "Failed to enroll member. Check if email already exists.",
       });
     } finally {
       setIsEnrolling(false);
@@ -186,9 +179,7 @@ export default function AdminDashboardPage() {
           email: editingMember.email,
           uid: editingMember.uid,
           newPassword: editNewPassword.trim(),
-          currentPassword: editingMember.currentPassword,
         });
-        updatedFields.currentPassword = editNewPassword.trim();
       }
 
       await updateUserViaApi(editingMember.uid, updatedFields);
@@ -206,11 +197,11 @@ export default function AdminDashboardPage() {
       setIsEditModalOpen(false);
       setEditingMember(null);
       setEditNewPassword("");
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Update error:", err);
       setFeedback({
         type: "error",
-        message: err.message || "Failed to update member profile.",
+        message: err instanceof Error ? err.message : "Failed to update member profile.",
       });
     } finally {
       setIsUpdating(false);
@@ -221,7 +212,6 @@ export default function AdminDashboardPage() {
   const openPasswordModal = (member: UserProfileData) => {
     setPasswordTargetMember(member);
     setNewPasswordInput("");
-    setShowStoredPassword(false);
     setIsPasswordModalOpen(true);
   };
 
@@ -241,28 +231,19 @@ export default function AdminDashboardPage() {
         email: passwordTargetMember.email,
         uid: passwordTargetMember.uid,
         newPassword: newPasswordInput.trim(),
-        currentPassword: passwordTargetMember.currentPassword,
       });
-
-      setMembers((prev) =>
-        prev.map((m) =>
-          m.uid === passwordTargetMember.uid
-            ? { ...m, currentPassword: newPasswordInput.trim() }
-            : m
-        )
-      );
 
       setFeedback({
         type: "success",
-        message: `Password for ${passwordTargetMember.displayName || passwordTargetMember.email} has been updated to "${newPasswordInput.trim()}".`,
+        message: `Password for ${passwordTargetMember.displayName || passwordTargetMember.email} has been updated.`,
       });
       setIsPasswordModalOpen(false);
       setPasswordTargetMember(null);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Password update error:", err);
       setFeedback({
         type: "error",
-        message: err.message || "Failed to update password.",
+        message: err instanceof Error ? err.message : "Failed to update password.",
       });
     } finally {
       setIsUpdatingPassword(false);
@@ -290,11 +271,11 @@ export default function AdminDashboardPage() {
       });
       setIsDeleteModalOpen(false);
       setDeletingMember(null);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Delete error:", err);
       setFeedback({
         type: "error",
-        message: err.message || "Failed to remove member account.",
+        message: err instanceof Error ? err.message : "Failed to remove member account.",
       });
     } finally {
       setIsDeleting(false);
@@ -350,31 +331,25 @@ export default function AdminDashboardPage() {
 
   return (
     <LayoutWrapper>
-      <div className="w-full px-4 md:px-8 py-6 max-w-7xl mx-auto flex flex-col gap-6">
-        {/* Header Bar */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-surface-container">
+      <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-8">
+        <header className="flex flex-col justify-between gap-5 border-b border-[#d9e2e3] pb-7 lg:flex-row lg:items-end">
           <div>
-            <div className="flex items-center gap-2">
-              <span className="bg-primary/10 text-primary px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wider flex items-center gap-1">
-                <span className="material-symbols-outlined text-[14px]">shield</span>
-                Administrator Console
-              </span>
-            </div>
-            <h1 className="font-headline-lg-mobile md:font-headline-lg text-on-surface font-bold mt-1.5">
-              Member Enrollment &amp; Management
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#54766f]">Administration <span className="px-1.5 text-[#a1b2b0]">/</span> People &amp; access</p>
+            <h1 className="mt-2 font-sans text-3xl font-semibold tracking-tight text-[#142f38] sm:text-4xl">
+              Member management
             </h1>
-            <p className="font-body-sm text-on-surface-variant text-xs mt-1">
-              Enroll new students and alumni, manage portal accounts, and perform real-time updates.
+            <p className="mt-2 max-w-2xl text-sm text-[#63777d]">
+              Manage community access, review enrollment, and monitor alumni hiring activity.
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap gap-2">
             <button
               onClick={() => {
                 setEnrollRole("student");
                 setIsEnrollModalOpen(true);
               }}
-              className="bg-primary text-on-primary hover:bg-primary/95 px-5 py-2.5 rounded-xl font-label-md font-bold text-xs shadow-sm flex items-center gap-2 transition-all active:scale-95 cursor-pointer"
+              className="inline-flex min-h-11 items-center gap-2 rounded-md bg-[#173c42] px-4 text-sm font-semibold text-white transition hover:bg-[#21525a]"
             >
               <span className="material-symbols-outlined text-[18px]">person_add</span>
               Enroll Student
@@ -384,13 +359,13 @@ export default function AdminDashboardPage() {
                 setEnrollRole("alumni");
                 setIsEnrollModalOpen(true);
               }}
-              className="bg-secondary text-on-secondary hover:bg-secondary/95 px-5 py-2.5 rounded-xl font-label-md font-bold text-xs shadow-sm flex items-center gap-2 transition-all active:scale-95 cursor-pointer"
+              className="inline-flex min-h-11 items-center gap-2 rounded-md border border-[#cbd8d9] px-4 text-sm font-semibold text-[#24444b] transition hover:bg-white"
             >
               <span className="material-symbols-outlined text-[18px]">history_edu</span>
               Enroll Alumnus
             </button>
           </div>
-        </div>
+        </header>
 
         {/* Feedback Alert */}
         {feedback && (
@@ -417,55 +392,52 @@ export default function AdminDashboardPage() {
         )}
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-surface-container-lowest p-5 rounded-2xl border border-surface-container shadow-sm flex flex-col justify-between">
-            <span className="font-label-sm text-on-surface-variant text-xs font-semibold">Total Accounts</span>
-            <div className="flex items-baseline gap-2 mt-2">
-              <span className="font-display text-3xl font-bold text-on-surface">{stats.total}</span>
-              <span className="text-[11px] text-on-surface-variant">registered</span>
+        <section aria-label="Member totals" className="grid grid-cols-2 divide-x divide-[#d6e0e1] border-y border-[#d6e0e1] py-5 md:grid-cols-4">
+          {[
+            { label: "All accounts", value: stats.total, icon: "groups" },
+            { label: "Students", value: stats.students, icon: "school" },
+            { label: "Alumni", value: stats.alumni, icon: "history_edu" },
+            { label: "Administrators", value: stats.admins, icon: "admin_panel_settings" },
+          ].map((metric) => (
+            <div key={metric.label} className="px-4 py-2 first:pl-0 md:px-6">
+              <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-[#73868a]"><span className="material-symbols-outlined text-[15px]">{metric.icon}</span>{metric.label}</p>
+              <p className="mt-1 text-3xl font-semibold tracking-tight text-[#173c42]">{metric.value}</p>
             </div>
-          </div>
+          ))}
+        </section>
 
-          <div className="bg-surface-container-lowest p-5 rounded-2xl border border-surface-container shadow-sm flex flex-col justify-between">
-            <span className="font-label-sm text-primary text-xs font-semibold flex items-center gap-1">
-              <span className="material-symbols-outlined text-[14px]">school</span> Enrolled Students
-            </span>
-            <div className="flex items-baseline gap-2 mt-2">
-              <span className="font-display text-3xl font-bold text-primary">{stats.students}</span>
-              <span className="text-[11px] text-on-surface-variant">active</span>
+        <section aria-labelledby="alumni-jobs-heading">
+          <div className="mb-3 flex items-end justify-between gap-4 border-b border-[#d9e2e3] pb-3">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#6c8584]">Community hiring</p>
+              <h2 id="alumni-jobs-heading" className="mt-1 text-lg font-semibold text-[#172f38]">Jobs posted by alumni</h2>
             </div>
+            <Link href="/jobs" className="text-xs font-semibold text-[#24635d] hover:underline">Open job board</Link>
           </div>
-
-          <div className="bg-surface-container-lowest p-5 rounded-2xl border border-surface-container shadow-sm flex flex-col justify-between">
-            <span className="font-label-sm text-secondary text-xs font-semibold flex items-center gap-1">
-              <span className="material-symbols-outlined text-[14px]">history_edu</span> Alumni Members
-            </span>
-            <div className="flex items-baseline gap-2 mt-2">
-              <span className="font-display text-3xl font-bold text-secondary">{stats.alumni}</span>
-              <span className="text-[11px] text-on-surface-variant">graduates</span>
+          {alumniJobs.length ? (
+            <div className="divide-y divide-[#e0e8e8] border-b border-[#d9e2e3]">
+              {alumniJobs.map((job) => (
+                <article key={job.id} className="grid gap-1 py-3 sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)] sm:items-center sm:gap-4">
+                  <h3 className="truncate text-sm font-semibold text-[#18343c]">{job.title}</h3>
+                  <p className="truncate text-xs text-[#687d82]">{job.company} <span className="px-1">·</span> {job.location}</p>
+                  <p className="truncate text-xs text-[#839296]">{job.postedByName || job.postedByEmail || "Alumni member"}</p>
+                </article>
+              ))}
             </div>
-          </div>
-
-          <div className="bg-surface-container-lowest p-5 rounded-2xl border border-surface-container shadow-sm flex flex-col justify-between">
-            <span className="font-label-sm text-on-surface-variant text-xs font-semibold flex items-center gap-1">
-              <span className="material-symbols-outlined text-[14px]">admin_panel_settings</span> Administrators
-            </span>
-            <div className="flex items-baseline gap-2 mt-2">
-              <span className="font-display text-3xl font-bold text-on-surface">{stats.admins}</span>
-              <span className="text-[11px] text-on-surface-variant">staff</span>
-            </div>
-          </div>
-        </div>
+          ) : (
+            <p className="border-b border-[#d9e2e3] py-6 text-sm text-[#718287]">No alumni job postings are available yet.</p>
+          )}
+        </section>
 
         {/* Filter and Search Bar */}
-        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 bg-surface-container-lowest p-4 rounded-2xl border border-surface-container shadow-sm">
+        <div className="flex flex-col items-stretch justify-between gap-4 border-y border-[#d9e2e3] py-3 md:flex-row md:items-center">
           {/* Role Tabs */}
-          <div className="flex p-1 bg-surface-container-low rounded-xl">
+          <div className="flex gap-1">
             <button
               onClick={() => setSelectedRoleFilter("all")}
               className={`px-4 py-2 rounded-lg font-label-md text-xs font-bold transition-all cursor-pointer ${
                 selectedRoleFilter === "all"
-                  ? "bg-surface text-on-surface shadow-sm"
+                    ? "bg-[#e4eeeb] text-[#1d514d]"
                   : "text-on-surface-variant hover:text-on-surface"
               }`}
             >
@@ -475,7 +447,7 @@ export default function AdminDashboardPage() {
               onClick={() => setSelectedRoleFilter("student")}
               className={`px-4 py-2 rounded-lg font-label-md text-xs font-bold transition-all cursor-pointer ${
                 selectedRoleFilter === "student"
-                  ? "bg-surface text-primary shadow-sm"
+                    ? "bg-[#e4eeeb] text-[#1d514d]"
                   : "text-on-surface-variant hover:text-on-surface"
               }`}
             >
@@ -485,7 +457,7 @@ export default function AdminDashboardPage() {
               onClick={() => setSelectedRoleFilter("alumni")}
               className={`px-4 py-2 rounded-lg font-label-md text-xs font-bold transition-all cursor-pointer ${
                 selectedRoleFilter === "alumni"
-                  ? "bg-surface text-secondary shadow-sm"
+                    ? "bg-[#e4eeeb] text-[#1d514d]"
                   : "text-on-surface-variant hover:text-on-surface"
               }`}
             >
@@ -503,13 +475,13 @@ export default function AdminDashboardPage() {
               placeholder="Search by name, email, department, company..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 rounded-xl bg-surface-container-low border border-surface-container text-on-surface text-xs outline-none focus:ring-2 focus:ring-primary"
+              className="w-full rounded-md border border-[#cbd8d9] bg-white py-2 pl-9 pr-4 text-sm text-[#18343c] outline-none focus:border-[#458a7c] focus:ring-2 focus:ring-[#458a7c]/20"
             />
           </div>
         </div>
 
         {/* Members Table */}
-        <div className="bg-surface-container-lowest rounded-2xl border border-surface-container shadow-sm overflow-hidden">
+        <div className="overflow-hidden border-y border-[#d9e2e3]">
           {isLoading ? (
             <div className="py-16 text-center text-on-surface-variant flex flex-col items-center justify-center gap-2">
               <span className="material-symbols-outlined animate-spin text-[32px] text-primary">
@@ -531,9 +503,9 @@ export default function AdminDashboardPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+              <table className="w-full border-collapse text-left">
                 <thead>
-                  <tr className="bg-surface-container-low/60 border-b border-surface-container text-on-surface-variant text-[11px] uppercase tracking-wider font-bold">
+                  <tr className="border-b border-[#d9e2e3] bg-white text-[10px] font-bold uppercase tracking-[0.1em] text-[#718287]">
                     <th className="py-3 px-4">Member</th>
                     <th className="py-3 px-4">Role</th>
                     <th className="py-3 px-4">Department</th>
@@ -542,12 +514,12 @@ export default function AdminDashboardPage() {
                     <th className="py-3 px-4 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-surface-container text-xs">
+                <tbody className="divide-y divide-[#e0e8e8] bg-white text-xs">
                   {filteredMembers.map((member) => {
                     const isMemberAdmin = member.role === "admin";
                     const initial = member.displayName?.charAt(0).toUpperCase() || member.email?.charAt(0).toUpperCase() || "U";
                     return (
-                      <tr key={member.uid} className="hover:bg-surface-container-low/30 transition-colors">
+                      <tr key={member.uid} className="transition-colors hover:bg-[#f5f8f7]">
                         {/* Member Identity */}
                         <td className="py-3.5 px-4">
                           <div className="flex items-center gap-3">
@@ -1033,36 +1005,14 @@ export default function AdminDashboardPage() {
               </div>
 
               <div className="flex flex-col gap-4">
-                {/* Current/Stored Password display if known */}
-                {passwordTargetMember.currentPassword && (
-                  <div className="p-3 bg-surface-container-low rounded-xl border border-surface-container flex items-center justify-between">
-                    <div>
-                      <span className="text-[10px] uppercase tracking-wider text-on-surface-variant font-bold block">Current Stored Password</span>
-                      <span className="font-mono text-xs font-bold text-on-surface tracking-wider">
-                        {showStoredPassword ? passwordTargetMember.currentPassword : "••••••••••••"}
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setShowStoredPassword(!showStoredPassword)}
-                      className="text-on-surface-variant hover:text-on-surface text-xs flex items-center gap-1 cursor-pointer bg-surface-container px-2 py-1 rounded-md"
-                    >
-                      <span className="material-symbols-outlined text-[14px]">
-                        {showStoredPassword ? "visibility_off" : "visibility"}
-                      </span>
-                      <span>{showStoredPassword ? "Hide" : "Show"}</span>
-                    </button>
-                  </div>
-                )}
-
-                {/* Form to set new password directly */}
+                {/* Set a new password through the authenticated admin API. */}
                 <form onSubmit={handleUpdatePassword} className="flex flex-col gap-3">
                   <div>
                     <label className="font-label-md text-on-surface block mb-1 text-xs font-semibold">
                       Set New Password *
                     </label>
                     <input
-                      type="text"
+                      type="password"
                       required
                       placeholder="Enter new password (min 6 characters)"
                       value={newPasswordInput}

@@ -3,6 +3,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
+import { requireAuth } from "../middleware/authMiddleware.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -32,7 +33,7 @@ const upload = multer({
 
 // POST /api/upload
 // Supports multipart/form-data ('file') and JSON base64 payload ('dataUrl' or 'image')
-router.post("/", (req, res, next) => {
+router.post("/", requireAuth, (req, res, next) => {
   upload.single("file")(req, res, (err) => {
     if (err) {
       return res.status(400).json({

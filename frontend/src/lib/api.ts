@@ -1,85 +1,53 @@
 import { Job, EventItem, Alumni, Application } from "@/data/mockData";
+import { auth } from "./firebase";
 import {
   getJobsFromFirestore,
-  addJobToFirestore,
   getEventsFromFirestore,
-  addEventToFirestore,
   getAlumniFromFirestore,
-  addAlumniToFirestore,
-  saveUserProfile,
   getUserProfile,
-  getAllUsersFromFirestore,
-  deleteUserFromFirestore,
-  adminRegisterMember,
-  adminUpdateMemberPassword,
   adminSendPasswordResetEmail,
-  addApplicationToFirestore,
-  getApplicationsFromFirestore,
-  getApplicationsForApplicantFromFirestore,
-  getApplicationsForPosterFromFirestore,
-  updateApplicationStatusInFirestore,
+  getEventRegistrationsForStudent,
+  saveEventRegistration,
   UserProfileData,
 } from "./firestore";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+
+async function apiRequest(url: string, init: RequestInit = {}): Promise<Response> {
+  const token = await auth.currentUser?.getIdToken();
+  const headers = new Headers(init.headers);
+  if (token && !headers.has("Authorization")) headers.set("Authorization", `Bearer ${token}`);
+  return fetch(url, { ...init, headers });
+}
 
 /**
  * Fetch jobs: queries Cloud Firestore directly, with backend API fallback
  */
 export async function fetchJobs(): Promise<Job[]> {
   try {
-    const firestoreJobs = await getJobsFromFirestore();
-    if (firestoreJobs && firestoreJobs.length > 0) {
-      return firestoreJobs;
-    }
-    // Fallback to backend REST API if Firestore is empty or loading
-    const res = await fetch(`${API_BASE_URL}/jobs`, { cache: "no-store" });
+    const res = await apiRequest(`${API_BASE_URL}/jobs`, { cache: "no-store" });
     if (res.ok) {
       const json = await res.json();
-      if (json.data && json.data.length > 0) return json.data;
+      if (Array.isArray(json.data)) return json.data;
     }
-    return firestoreJobs;
   } catch (err) {
-    try {
-      const res = await fetch(`${API_BASE_URL}/jobs`, { cache: "no-store" });
-      if (res.ok) {
-        const json = await res.json();
-        return json.data || [];
-      }
-    } catch (e) {}
-    return [];
+    console.warn("Jobs API unavailable; using Firestore read fallback:", err);
   }
+  return getJobsFromFirestore();
 }
 
 /**
  * Create a job: persists DIRECTLY to Cloud Firestore and syncs to backend API
  */
 export async function createJobViaApi(jobData: Omit<Job, "id">): Promise<Job> {
-  let createdJob: Job | null = null;
-  try {
-    // 1. Direct write to Cloud Firestore
-    createdJob = await addJobToFirestore(jobData);
-  } catch (firestoreErr) {
-    console.warn("Direct Firestore job write notice:", firestoreErr);
-  }
-
-  // 2. Sync to Backend REST API in background
-  try {
-    const res = await fetch(`${API_BASE_URL}/jobs`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(jobData),
-    });
-    if (res.ok) {
-      const json = await res.json();
-      if (!createdJob) createdJob = json.data;
-    }
-  } catch (backendErr) {
-    // Backend sync is secondary
-  }
-
-  if (createdJob) return createdJob;
-  return { id: `job-${Date.now()}`, ...jobData };
+  const res = await apiRequest(`${API_BASE_URL}/jobs`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(jobData),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.message || "Unable to create job");
+  return json.data as Job;
 }
 
 /**
@@ -87,57 +55,44 @@ export async function createJobViaApi(jobData: Omit<Job, "id">): Promise<Job> {
  */
 export async function fetchEvents(): Promise<EventItem[]> {
   try {
-    const firestoreEvents = await getEventsFromFirestore();
-    if (firestoreEvents && firestoreEvents.length > 0) {
-      return firestoreEvents;
-    }
-    const res = await fetch(`${API_BASE_URL}/events`, { cache: "no-store" });
+    const res = await apiRequest(`${API_BASE_URL}/events`, { cache: "no-store" });
     if (res.ok) {
       const json = await res.json();
-      if (json.data && json.data.length > 0) return json.data;
+      if (Array.isArray(json.data)) return json.data;
     }
-    return firestoreEvents;
   } catch (err) {
-    try {
-      const res = await fetch(`${API_BASE_URL}/events`, { cache: "no-store" });
-      if (res.ok) {
-        const json = await res.json();
-        return json.data || [];
-      }
-    } catch (e) {}
-    return [];
+    console.warn("Events API unavailable; using Firestore read fallback:", err);
   }
+  return getEventsFromFirestore();
+}
+
+export async function fetchEventRegistrationsForStudent(studentUid: string) {
+  return getEventRegistrationsForStudent(studentUid);
+}
+
+export async function registerForEvent(registration: {
+  eventId: string;
+  eventTitle: string;
+  studentUid: string;
+  studentName: string;
+  studentEmail: string;
+  status: "registered";
+}) {
+  return saveEventRegistration(registration);
 }
 
 /**
  * Create an event: persists DIRECTLY to Cloud Firestore and syncs to backend API
  */
 export async function createEventViaApi(eventData: Omit<EventItem, "id">): Promise<EventItem> {
-  let createdEvent: EventItem | null = null;
-  try {
-    // 1. Direct write to Cloud Firestore
-    createdEvent = await addEventToFirestore(eventData);
-  } catch (firestoreErr) {
-    console.warn("Direct Firestore event write notice:", firestoreErr);
-  }
-
-  // 2. Sync to Backend REST API
-  try {
-    const res = await fetch(`${API_BASE_URL}/events`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(eventData),
-    });
-    if (res.ok) {
-      const json = await res.json();
-      if (!createdEvent) createdEvent = json.data;
-    }
-  } catch (backendErr) {
-    // Backend sync is secondary
-  }
-
-  if (createdEvent) return createdEvent;
-  return { id: `event-${Date.now()}`, ...eventData };
+  const res = await apiRequest(`${API_BASE_URL}/events`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(eventData),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.message || "Unable to create event");
+  return json.data as EventItem;
 }
 
 /**
@@ -150,7 +105,7 @@ export async function fetchAlumni(): Promise<Alumni[]> {
   try {
     const firestoreAlumni = await getAlumniFromFirestore();
     firestoreAlumni.forEach((a) => alumniMap.set(a.id, a));
-  } catch (err) {}
+  } catch {}
 
   // 2. Fetch from Backend /api/alumni
   try {
@@ -165,38 +120,11 @@ export async function fetchAlumni(): Promise<Alumni[]> {
         });
       }
     }
-  } catch (e) {}
+  } catch {}
 
   // 3. Fallback: also ensure any user with role === "alumni" from /api/users is included
   try {
-    const usersRes = await fetch(`${API_BASE_URL}/users`, { cache: "no-store" });
-    if (usersRes.ok) {
-      const json = await usersRes.json();
-      if (Array.isArray(json.data)) {
-        json.data
-          .filter((u: any) => u.role === "alumni")
-          .forEach((u: any) => {
-            const uid = u.uid || u.id;
-            if (!alumniMap.has(uid)) {
-              alumniMap.set(uid, {
-                id: uid,
-                name: u.displayName || u.email?.split("@")[0] || "Alumni Member",
-                email: u.email,
-                classYear: u.classYear || "Alumni",
-                department: u.department || "General",
-                company: u.company || "Alumni Community",
-                role: u.company ? `Member at ${u.company}` : "Alumni Member",
-                skills: ["Alumni Community", "Mentorship"],
-                avatarUrl: u.photoURL || "",
-                isVerified: true,
-                isMentor: true,
-                createdAt: u.createdAt,
-              });
-            }
-          });
-      }
-    }
-  } catch (e) {}
+  } catch {}
 
   return Array.from(alumniMap.values());
 }
@@ -205,52 +133,28 @@ export async function fetchAlumni(): Promise<Alumni[]> {
  * Create alumni: persists DIRECTLY to Cloud Firestore and syncs to backend API
  */
 export async function createAlumniViaApi(alumniData: Omit<Alumni, "id">): Promise<Alumni> {
-  let createdAlumnus: Alumni | null = null;
-  try {
-    // 1. Direct write to Cloud Firestore
-    createdAlumnus = await addAlumniToFirestore(alumniData);
-  } catch (firestoreErr) {
-    console.warn("Direct Firestore alumni write notice:", firestoreErr);
-  }
-
-  // 2. Sync to Backend REST API
-  try {
-    const res = await fetch(`${API_BASE_URL}/alumni`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(alumniData),
-    });
-    if (res.ok) {
-      const json = await res.json();
-      if (!createdAlumnus) createdAlumnus = json.data;
-    }
-  } catch (backendErr) {
-    // Backend sync is secondary
-  }
-
-  if (createdAlumnus) return createdAlumnus;
-  return { id: `alumni-${Date.now()}`, ...alumniData };
+  const response = await apiRequest(`${API_BASE_URL}/alumni`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(alumniData),
+  });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.message || "Unable to create alumni profile");
+  return result.data as Alumni;
 }
 
 /**
- * Save user profile: persists DIRECTLY to Cloud Firestore and syncs to backend
+ * Sync an authenticated user's profile to the backend store
  */
 export async function saveProfileToBackend(userProfile: Partial<UserProfileData> & { uid: string }) {
-  try {
-    await saveUserProfile(userProfile);
-  } catch (e) {
-    console.warn("Direct Firestore profile save notice:", e);
-  }
-  try {
-    const res = await fetch(`${API_BASE_URL}/users`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(userProfile),
-    });
-    if (res.ok) return await res.json();
-  } catch (err) {
-    // Non-fatal
-  }
+  const res = await apiRequest(`${API_BASE_URL}/users`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(userProfile),
+  });
+  const result = await res.json();
+  if (!res.ok) throw new Error(result.message || "Unable to sync the account profile");
+  return result;
 }
 
 /**
@@ -260,14 +164,14 @@ export async function fetchProfileFromBackend(uid: string): Promise<UserProfileD
   try {
     const firestoreProfile = await getUserProfile(uid);
     if (firestoreProfile) return firestoreProfile;
-  } catch (e) {}
+  } catch {}
   try {
-    const res = await fetch(`${API_BASE_URL}/users/${uid}`, { cache: "no-store" });
+    const res = await apiRequest(`${API_BASE_URL}/users/${uid}`, { cache: "no-store" });
     if (res.ok) {
       const json = await res.json();
       return json.data;
     }
-  } catch (err) {}
+  } catch {}
   return null;
 }
 
@@ -306,10 +210,9 @@ export async function apiLogin(payload: { email: string; password: string }) {
  * Backend Auth: Verify token via REST API
  */
 export async function apiVerifyToken(token: string) {
-  const res = await fetch(`${API_BASE_URL}/auth/verify`, {
+  const res = await apiRequest(`${API_BASE_URL}/auth/verify`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ token }),
+    headers: { "Authorization": `Bearer ${token}` },
   });
   return await res.json();
 }
@@ -318,27 +221,10 @@ export async function apiVerifyToken(token: string) {
  * Fetch all enrolled students and alumni
  */
 export async function fetchAllUsers(): Promise<UserProfileData[]> {
-  try {
-    const firestoreUsers = await getAllUsersFromFirestore();
-    if (firestoreUsers && firestoreUsers.length > 0) {
-      return firestoreUsers;
-    }
-    const res = await fetch(`${API_BASE_URL}/users`, { cache: "no-store" });
-    if (res.ok) {
-      const json = await res.json();
-      return json.data || [];
-    }
-    return firestoreUsers;
-  } catch (err) {
-    try {
-      const res = await fetch(`${API_BASE_URL}/users`, { cache: "no-store" });
-      if (res.ok) {
-        const json = await res.json();
-        return json.data || [];
-      }
-    } catch (e) {}
-    return [];
-  }
+  const res = await apiRequest(`${API_BASE_URL}/users`, { cache: "no-store" });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.message || "Unable to load member accounts");
+  return Array.isArray(json.data) ? json.data : [];
 }
 
 /**
@@ -354,16 +240,16 @@ export async function adminEnrollMember(params: {
   company?: string;
   bio?: string;
 }): Promise<UserProfileData> {
-  const profile = await adminRegisterMember(params);
-  // Replicate to backend
-  try {
-    await fetch(`${API_BASE_URL}/users`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(profile),
-    });
-  } catch (e) {}
-  return profile;
+  const response = await apiRequest(`${API_BASE_URL}/users/enroll`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(params),
+  });
+  const result = await response.json();
+  if (!response.ok) {
+    throw new Error(result.message || "Unable to enroll member");
+  }
+  return result.data as UserProfileData;
 }
 
 /**
@@ -373,26 +259,23 @@ export async function updateUserViaApi(
   uid: string,
   updatedData: Partial<UserProfileData>
 ): Promise<void> {
-  await saveUserProfile({ uid, ...updatedData });
-  try {
-    await fetch(`${API_BASE_URL}/users`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ uid, ...updatedData }),
-    });
-  } catch (e) {}
+  const response = await apiRequest(`${API_BASE_URL}/users`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ uid, ...updatedData }),
+  });
+  if (!response.ok) throw new Error("Unable to update member profile");
 }
 
 /**
  * Admin: Delete a student or alumnus account
  */
 export async function deleteUserViaApi(uid: string): Promise<void> {
-  await deleteUserFromFirestore(uid);
-  try {
-    await fetch(`${API_BASE_URL}/users/${uid}`, {
-      method: "DELETE",
-    });
-  } catch (e) {}
+  const response = await apiRequest(`${API_BASE_URL}/users/${uid}`, { method: "DELETE" });
+  if (!response.ok) {
+    const result = await response.json();
+    throw new Error(result.message || "Unable to delete member account");
+  }
 }
 
 /**
@@ -402,16 +285,16 @@ export async function adminChangePassword(params: {
   email: string;
   uid: string;
   newPassword: string;
-  currentPassword?: string;
 }): Promise<void> {
-  await adminUpdateMemberPassword(params);
-  try {
-    await fetch(`${API_BASE_URL}/users/${params.uid}/password`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ newPassword: params.newPassword }),
-    });
-  } catch (e) {}
+  const response = await apiRequest(`${API_BASE_URL}/users/${params.uid}/password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ newPassword: params.newPassword }),
+  });
+  if (!response.ok) {
+    const result = await response.json();
+    throw new Error(result.message || "Unable to update password");
+  }
 }
 
 /**
@@ -431,117 +314,34 @@ export async function adminSendResetEmail(email: string): Promise<void> {
 export async function submitJobApplicationViaApi(
   appData: Omit<Application, "id">
 ): Promise<Application> {
-  const appId = `app-${Date.now()}`;
-  const fullApp: Application = {
-    id: appId,
-    ...appData,
-  };
-
-  // 1. Direct write to Firestore
-  try {
-    await addApplicationToFirestore(fullApp);
-  } catch (err) {
-    console.warn("Direct Firestore application write notice:", err);
-  }
-
-  // 2. Sync with Backend REST API
-  try {
-    const res = await fetch(`${API_BASE_URL}/applications`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(fullApp),
-    });
-    if (res.ok) {
-      const json = await res.json();
-      if (json.data?.id) fullApp.id = json.data.id;
-    }
-  } catch (e) {}
-
-  return fullApp;
+  const response = await apiRequest(`${API_BASE_URL}/applications`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(appData),
+  });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.message || "Unable to submit application");
+  return result.data as Application;
 }
 
 /**
  * Fetch all applications submitted by a specific applicant
  */
-export async function fetchApplicationsForApplicant(
-  applicantId: string,
-  applicantEmail?: string
-): Promise<Application[]> {
-  const appsMap = new Map<string, Application>();
-
-  // 1. Fetch from Backend REST API
-  try {
-    const params = new URLSearchParams();
-    if (applicantId) params.append("applicantId", applicantId);
-    if (applicantEmail) params.append("applicantEmail", applicantEmail);
-
-    const res = await fetch(`${API_BASE_URL}/applications?${params.toString()}`, {
-      cache: "no-store",
-    });
-    if (res.ok) {
-      const json = await res.json();
-      if (Array.isArray(json.data)) {
-        json.data.forEach((app: Application) => appsMap.set(app.id, app));
-      }
-    }
-  } catch (e) {}
-
-  // 2. Fetch from Firestore
-  try {
-    const firestoreApps = await getApplicationsForApplicantFromFirestore(
-      applicantId,
-      applicantEmail
-    );
-    firestoreApps.forEach((app) => {
-      const existing = appsMap.get(app.id);
-      // Prioritize decisive status (Selected / Rejected) if there's any lag
-      if (!existing || (app.status !== "Under Review" && existing.status === "Under Review")) {
-        appsMap.set(app.id, app);
-      }
-    });
-  } catch (err) {}
-
-  return Array.from(appsMap.values());
+export async function fetchApplicationsForApplicant(): Promise<Application[]> {
+  const response = await apiRequest(`${API_BASE_URL}/applications`, { cache: "no-store" });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.message || "Unable to load applications");
+  return Array.isArray(result.data) ? result.data : [];
 }
 
 /**
  * Fetch all applications received for jobs posted by a specific alumnus
  */
-export async function fetchApplicationsForPoster(
-  posterId: string,
-  posterEmail?: string
-): Promise<Application[]> {
-  const appsMap = new Map<string, Application>();
-
-  // 1. Fetch from Backend REST API
-  try {
-    const params = new URLSearchParams();
-    if (posterId) params.append("posterId", posterId);
-    if (posterEmail) params.append("posterEmail", posterEmail);
-
-    const res = await fetch(`${API_BASE_URL}/applications?${params.toString()}`, {
-      cache: "no-store",
-    });
-    if (res.ok) {
-      const json = await res.json();
-      if (Array.isArray(json.data)) {
-        json.data.forEach((app: Application) => appsMap.set(app.id, app));
-      }
-    }
-  } catch (e) {}
-
-  // 2. Fetch from Firestore
-  try {
-    const firestoreApps = await getApplicationsForPosterFromFirestore(posterId, posterEmail);
-    firestoreApps.forEach((app) => {
-      const existing = appsMap.get(app.id);
-      if (!existing || (app.status !== "Under Review" && existing.status === "Under Review")) {
-        appsMap.set(app.id, app);
-      }
-    });
-  } catch (err) {}
-
-  return Array.from(appsMap.values());
+export async function fetchApplicationsForPoster(): Promise<Application[]> {
+  const response = await apiRequest(`${API_BASE_URL}/applications`, { cache: "no-store" });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.message || "Unable to load applications");
+  return Array.isArray(result.data) ? result.data : [];
 }
 
 /**
@@ -551,22 +351,14 @@ export async function updateApplicationStatusViaApi(
   applicationId: string,
   status: "Under Review" | "Selected" | "Rejected"
 ): Promise<void> {
-  // 1. Update in Backend REST API
-  try {
-    await fetch(`${API_BASE_URL}/applications/${applicationId}/status`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
-    });
-  } catch (e) {
-    console.warn("Backend status update notice:", e);
-  }
-
-  // 2. Update in Firestore
-  try {
-    await updateApplicationStatusInFirestore(applicationId, status);
-  } catch (err) {
-    console.warn("Firestore application status update notice:", err);
+  const response = await apiRequest(`${API_BASE_URL}/applications/${applicationId}/status`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status }),
+  });
+  if (!response.ok) {
+    const result = await response.json();
+    throw new Error(result.message || "Unable to update application status");
   }
 }
 
@@ -577,7 +369,7 @@ export async function updateApplicationStatusViaApi(
 export async function uploadPhotoViaApi(fileOrDataUrl: File | string): Promise<string> {
   try {
     if (typeof fileOrDataUrl === "string") {
-      const res = await fetch(`${API_BASE_URL}/upload`, {
+      const res = await apiRequest(`${API_BASE_URL}/upload`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ dataUrl: fileOrDataUrl }),
@@ -589,7 +381,7 @@ export async function uploadPhotoViaApi(fileOrDataUrl: File | string): Promise<s
     } else {
       const formData = new FormData();
       formData.append("file", fileOrDataUrl);
-      const res = await fetch(`${API_BASE_URL}/upload`, {
+      const res = await apiRequest(`${API_BASE_URL}/upload`, {
         method: "POST",
         body: formData,
       });

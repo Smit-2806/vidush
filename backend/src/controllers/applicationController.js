@@ -3,27 +3,23 @@ import { db } from "../config/db.js";
 // GET /api/applications
 export async function getApplications(req, res) {
   try {
-    const { applicantId, applicantEmail, posterId, posterEmail, jobId } = req.query;
+    const { jobId } = req.query;
     const snapshot = await db.collection("applications").get();
     let applications = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 
-    if (applicantId || applicantEmail) {
+    if (req.user.role === "student") {
       applications = applications.filter((app) => {
-        const matchId = applicantId && app.applicantId === applicantId;
-        const matchEmail =
-          applicantEmail &&
-          app.applicantEmail?.toLowerCase() === applicantEmail.toLowerCase();
-        return matchId || matchEmail;
+        return app.applicantId === req.user.uid;
       });
-    }
-
-    if (posterId || posterEmail) {
+    } else if (req.user.role === "alumni") {
+      const jobsSnapshot = await db.collection("jobs").get();
+      const ownedJobIds = new Set(
+        jobsSnapshot.docs
+          .filter((job) => job.data().postedBy === req.user.uid)
+          .map((job) => job.id)
+      );
       applications = applications.filter((app) => {
-        const matchId = posterId && app.posterId === posterId;
-        const matchEmail =
-          posterEmail &&
-          app.posterEmail?.toLowerCase() === posterEmail.toLowerCase();
-        return matchId || matchEmail;
+        return app.posterId === req.user.uid || ownedJobIds.has(app.jobId);
       });
     }
 
@@ -50,42 +46,39 @@ export async function createApplication(req, res) {
   try {
     const {
       jobId,
-      jobTitle,
-      company,
-      posterId,
-      posterEmail,
-      applicantId,
-      applicantName,
-      applicantEmail,
-      applicantRole,
       resumeName,
       coverLetter,
-      appliedDate,
     } = req.body;
 
-    if (!jobId || !applicantId || !resumeName) {
+    if (!jobId || !resumeName) {
       return res.status(400).json({
         success: false,
         message: "Job ID, applicant information, and resume are required",
       });
     }
 
+    const jobSnapshot = await db.collection("jobs").doc(jobId).get();
+    if (!jobSnapshot.exists) {
+      return res.status(404).json({ success: false, message: "Job not found" });
+    }
+    const job = jobSnapshot.data();
+
     const appId = req.body.id || `app-${Date.now()}`;
     const newApp = {
       id: appId,
       jobId,
-      jobTitle: jobTitle || "Role",
-      company: company || "Company",
-      posterId: posterId || "",
-      posterEmail: posterEmail || "",
-      applicantId,
-      applicantName: applicantName || "Candidate",
-      applicantEmail: applicantEmail || "",
-      applicantRole: applicantRole || "student",
+      jobTitle: job.title || "Role",
+      company: job.company || "Company",
+      posterId: job.postedBy || "",
+      posterEmail: job.postedByEmail || "",
+      applicantId: req.user.uid,
+      applicantName: req.user.displayName || "Candidate",
+      applicantEmail: req.user.email || "",
+      applicantRole: req.user.role,
       resumeName,
       coverLetter: coverLetter || "",
-      appliedDate: appliedDate || new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-      status: req.body.status || "Under Review",
+      appliedDate: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+      status: "Under Review",
       createdAt: new Date().toISOString(),
     };
 
@@ -126,6 +119,14 @@ export async function updateApplicationStatus(req, res) {
         success: false,
         message: "Application not found",
       });
+    }
+
+    if (req.user.role !== "admin") {
+      const application = doc.data();
+      const job = application.jobId ? await db.collection("jobs").doc(application.jobId).get() : null;
+      if (application.posterId !== req.user.uid && (!job?.exists || job.data().postedBy !== req.user.uid)) {
+        return res.status(403).json({ success: false, message: "You can only review applicants for your own jobs" });
+      }
     }
 
     if (typeof appRef.update === "function") {

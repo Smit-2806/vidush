@@ -6,19 +6,39 @@ import { EventItem } from "@/data/mockData";
 import { fetchEvents, createEventViaApi } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 
+type EventFilter = "live" | "completed" | "all";
+
+function isEventCompleted(event: EventItem): boolean {
+  if (event.date) {
+    const date = new Date(`${event.date}T00:00:00`);
+    return !Number.isNaN(date.getTime()) && date < new Date(new Date().setHours(0, 0, 0, 0));
+  }
+  if (event.status) return event.status === "completed";
+  const month = new Date(`${event.month} 1, 2000`).getMonth();
+  const day = Number(event.day);
+  if (!Number.isInteger(month) || !Number.isInteger(day)) return false;
+  const now = new Date();
+  return new Date(now.getFullYear(), month, day) < new Date(now.getFullYear(), now.getMonth(), now.getDate());
+}
+
 export default function EventsPage() {
   const { userProfile } = useAuth();
   const isAdmin = userProfile?.role === "admin";
 
   const [events, setEvents] = useState<EventItem[]>([]);
+  const [eventFilter, setEventFilter] = useState<EventFilter>("live");
   const [isLoading, setIsLoading] = useState(true);
 
   // New Event Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [title, setTitle] = useState("");
-  const [month, setMonth] = useState("Nov");
-  const [day, setDay] = useState("15");
+  const [date, setDate] = useState(() => {
+    const today = new Date();
+    today.setMinutes(today.getMinutes() - today.getTimezoneOffset());
+    return today.toISOString().slice(0, 10);
+  });
   const [location, setLocation] = useState("");
+  const [description, setDescription] = useState("");
   const [isVirtual, setIsVirtual] = useState(false);
   const [imageUrl, setImageUrl] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -46,135 +66,87 @@ export default function EventsPage() {
     if (!title || !location) return;
 
     setIsSaving(true);
+    const selectedDate = new Date(`${date}T00:00:00`);
     const eventData: Omit<EventItem, "id"> = {
       title,
-      month,
-      day,
+      month: selectedDate.toLocaleString("en-US", { month: "short" }),
+      day: String(selectedDate.getDate()),
+      date,
+      status: "live",
       location,
+      description: description.trim(),
       isVirtual,
       imageUrl: imageUrl || "https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&q=80&w=400",
     };
 
     try {
       const savedEvent = await createEventViaApi(eventData);
-      setEvents([savedEvent, ...events]);
-    } catch (err) {
-      const fallback: EventItem = { id: `event-${Date.now()}`, ...eventData };
-      setEvents([fallback, ...events]);
-    } finally {
-      setIsSaving(false);
+      setEvents((previous) => [savedEvent, ...previous]);
       setIsModalOpen(false);
       setTitle("");
       setLocation("");
+      setDescription("");
       setImageUrl("");
+    } catch (err) {
+      console.error("Failed to create event:", err);
+      alert(err instanceof Error ? err.message : "Unable to create this event. Please try again.");
+    } finally {
+      setIsSaving(false);
     }
   };
 
+  const liveEvents = events.filter((event) => !isEventCompleted(event));
+  const completedEvents = events.filter(isEventCompleted);
+  const visibleEvents = eventFilter === "live" ? liveEvents : eventFilter === "completed" ? completedEvents : events;
+
   return (
     <LayoutWrapper>
-      <div className="flex flex-col w-full px-4 gap-6 mt-4 pb-16 max-w-4xl mx-auto">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="mx-auto w-full max-w-[1440px] space-y-7">
+        <header className="flex flex-col justify-between gap-5 border-b border-[#d9e2e3] pb-6 md:flex-row md:items-end">
           <div>
-            <h1 className="font-headline-lg-mobile text-headline-lg-mobile text-on-surface">
-              University Events
-            </h1>
-            <p className="font-body-md text-on-surface-variant mt-1">
-              Find upcoming professional and social networking events hosted by the alumni community.
-            </p>
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#54766f]">Community <span className="px-1.5 text-[#a1b2b0]">/</span> Calendar</p>
+            <h1 className="mt-2 font-sans text-3xl font-semibold tracking-tight text-[#142f38] sm:text-4xl">University events</h1>
+            <p className="mt-2 text-sm text-[#63777d]">Find gatherings, workshops, and community events.</p>
           </div>
           {isAdmin && (
             <button
               onClick={() => setIsModalOpen(true)}
-              className="self-start md:self-auto bg-primary text-on-primary hover:bg-primary/95 px-5 py-2.5 rounded-xl font-label-md font-bold shadow-sm transition-all active:scale-95 flex items-center gap-2 cursor-pointer"
+              className="inline-flex min-h-11 items-center gap-2 self-start rounded-md bg-[#173c42] px-4 text-sm font-semibold text-white transition hover:bg-[#21525a] md:self-auto"
             >
               <span className="material-symbols-outlined text-[20px]">add</span>
               Host an Event
             </button>
           )}
-        </div>
+        </header>
 
-        {events.length === 0 ? (
-          <div className="text-center py-16 bg-surface-container-lowest rounded-2xl shadow-sm border border-dashed border-outline-variant/30 mt-4 flex flex-col items-center justify-center p-6">
-            <span className="material-symbols-outlined text-[48px] text-outline opacity-40">event_busy</span>
-            <p className="font-headline-md text-on-surface mt-2 font-bold">No Events Scheduled</p>
-            <p className="font-body-sm text-on-surface-variant mt-1 max-w-sm">
-              There are currently no upcoming events scheduled on the portal.
-            </p>
-            {isAdmin ? (
-              <button
-                onClick={() => setIsModalOpen(true)}
-                className="mt-4 bg-primary text-on-primary px-5 py-2.5 rounded-xl font-label-md font-bold hover:bg-primary/90 transition-all cursor-pointer"
-              >
-                Host the First Event
-              </button>
-            ) : (
-              <p className="mt-3 font-body-sm text-outline italic">
-                Check back soon for upcoming gatherings and workshops.
-              </p>
-            )}
+        <section aria-label="Event filters" className="flex flex-wrap items-center justify-between gap-3 border-b border-[#d9e2e3] pb-4">
+          <div className="flex gap-5" role="group" aria-label="Filter events">
+            {(["live", "completed", "all"] as const).map((filter) => <button key={filter} type="button" onClick={() => setEventFilter(filter)} aria-pressed={eventFilter === filter} className={`border-b-2 pb-2 text-sm font-semibold capitalize transition ${eventFilter === filter ? "border-[#24635d] text-[#205b55]" : "border-transparent text-[#788a8e] hover:text-[#24444b]"}`}>{filter === "live" ? `Live & upcoming (${liveEvents.length})` : filter === "completed" ? `Completed (${completedEvents.length})` : "All events"}</button>)}
           </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
-            {events.map((event) => (
-              <div
-                key={event.id}
-                className="bg-surface-container-lowest rounded-2xl shadow-sm overflow-hidden flex flex-col group hover:shadow-md transition-all duration-300 border border-surface-container"
-              >
-                <div className="h-44 w-full relative overflow-hidden bg-surface-container">
-                  {event.imageUrl ? (
-                    <img
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      alt={event.title}
-                      src={event.imageUrl}
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-primary/40">
-                      <span className="material-symbols-outlined text-[48px]">calendar_month</span>
-                    </div>
-                  )}
-                  <div className="absolute top-3 left-3 bg-surface-container-lowest/95 backdrop-blur text-on-surface px-3 py-1.5 rounded-lg flex flex-col items-center justify-center min-w-[54px] shadow-md border border-surface-container-high/50">
-                    <span className="font-label-sm text-label-sm uppercase text-error text-[11px] font-bold">
-                      {event.month}
-                    </span>
-                    <span className="font-headline-md text-headline-md leading-none mt-1 text-primary">
-                      {event.day}
-                    </span>
-                  </div>
-                </div>
-                
-                <div className="p-6 flex flex-col flex-1 gap-4">
-                  <h3 className="font-headline-md text-on-surface line-clamp-1 font-bold">
-                    {event.title}
-                  </h3>
-                  
-                  <div className="flex flex-col gap-2 text-on-surface-variant font-body-sm text-body-sm mt-auto">
-                    <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-[16px] text-primary">
-                        {event.isVirtual ? "videocam" : "location_on"}
-                      </span>
-                      <span>{event.location}</span>
-                    </div>
-                  </div>
+          <span className="text-xs text-[#849398]">{visibleEvents.length} events</span>
+        </section>
 
-                  <div className="flex gap-2 mt-2 pt-2 border-t border-surface-container-low">
-                    <button
-                      onClick={() => {
-                        if (typeof navigator !== "undefined" && navigator.clipboard) {
-                          navigator.clipboard.writeText(`${event.title} - ${event.month} ${event.day} at ${event.location}`);
-                        }
-                        alert(`Event details copied to clipboard!`);
-                      }}
-                      className="flex-1 bg-surface-container text-primary hover:bg-surface-container-high transition-colors font-label-md py-2.5 rounded-lg flex items-center justify-center gap-1.5 font-bold text-xs cursor-pointer"
-                      aria-label="Share Event"
-                    >
-                      <span className="material-symbols-outlined text-[18px]">share</span>
-                      Share Event
-                    </button>
-                  </div>
+        {visibleEvents.length ? (
+          <div className="divide-y divide-[#dfe7e7] border-b border-[#d9e2e3]">
+            {visibleEvents.map((event) => (
+              <article key={event.id} className="grid gap-4 py-5 sm:grid-cols-[72px_minmax(0,1fr)_auto] sm:items-center">
+                <div className="flex h-[68px] w-[68px] flex-col items-center justify-center rounded-md bg-[#e4efeb] text-[#255852]">
+                  <span className="text-[10px] font-bold uppercase tracking-wide">{event.month}</span>
+                  <span className="mt-0.5 text-2xl font-semibold leading-none">{event.day}</span>
                 </div>
-              </div>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2"><h2 className="text-base font-semibold text-[#17343b]">{event.title}</h2><span className={`text-[10px] font-bold uppercase tracking-wider ${isEventCompleted(event) ? "text-[#879599]" : "text-[#287359]"}`}>{isEventCompleted(event) ? "Completed" : "Upcoming"}</span></div>
+                  <p className="mt-1 flex items-center gap-1.5 text-xs text-[#718287]"><span className="material-symbols-outlined text-[15px]">{event.isVirtual ? "videocam" : "location_on"}</span>{event.location}</p>
+                  {event.description && <p className="mt-2 max-w-3xl text-sm leading-relaxed text-[#63777d]">{event.description}</p>}
+                </div>
+                <button type="button" onClick={() => { void navigator.clipboard?.writeText(`${event.title} - ${event.month} ${event.day} at ${event.location}`); }} aria-label={`Copy details for ${event.title}`} title="Copy event details" className="flex h-10 w-10 items-center justify-center rounded-md text-[#517078] transition hover:bg-[#e4efeb] hover:text-[#205b55]">
+                  <span className="material-symbols-outlined text-[19px]">content_copy</span>
+                </button>
+              </article>
             ))}
           </div>
+        ) : (
+          <div className="border-y border-dashed border-[#cbd8d9] py-16 text-center"><span className="material-symbols-outlined text-3xl text-[#829398]">event_busy</span><p className="mt-2 text-sm font-semibold text-[#29474e]">{isLoading ? "Loading events…" : "No events in this view"}</p><p className="mt-1 text-xs text-[#819095]">Try another filter or check back later.</p></div>
         )}
 
         {/* Create Event Modal - Admin Only */}
@@ -206,34 +178,18 @@ export default function EventsPage() {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="font-label-md text-on-surface block mb-1 text-xs font-semibold">
-                      Month
-                    </label>
-                    <select
-                      value={month}
-                      onChange={(e) => setMonth(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-lg bg-surface-container-low border border-surface-container text-on-surface text-sm outline-none focus:ring-2 focus:ring-primary"
-                    >
-                      {["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].map((m) => (
-                        <option key={m} value={m}>{m}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="font-label-md text-on-surface block mb-1 text-xs font-semibold">
-                      Day
-                    </label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={31}
-                      value={day}
-                      onChange={(e) => setDay(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-lg bg-surface-container-low border border-surface-container text-on-surface text-sm outline-none focus:ring-2 focus:ring-primary"
-                    />
-                  </div>
+                <div>
+                  <label className="font-label-md text-on-surface block mb-1 text-xs font-semibold">
+                    Event Date *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    min={new Date().toISOString().slice(0, 10)}
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-lg bg-surface-container-low border border-surface-container text-on-surface text-sm outline-none focus:ring-2 focus:ring-primary"
+                  />
                 </div>
 
                 <div>
@@ -247,6 +203,20 @@ export default function EventsPage() {
                     value={location}
                     onChange={(e) => setLocation(e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-lg bg-surface-container-low border border-surface-container text-on-surface text-sm outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-label-md text-on-surface block mb-1 text-xs font-semibold">
+                    Event Description
+                  </label>
+                  <textarea
+                    rows={3}
+                    maxLength={500}
+                    placeholder="What will attendees learn or do?"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    className="w-full resize-y px-3.5 py-2.5 rounded-lg bg-surface-container-low border border-surface-container text-on-surface text-sm outline-none focus:ring-2 focus:ring-primary"
                   />
                 </div>
 

@@ -58,7 +58,11 @@ PORT=5000
 NODE_ENV=development
 CLIENT_ORIGIN=http://localhost:3000
 FIREBASE_PROJECT_ID=alunimi-947f0
+ADMIN_EMAILS=admin@alumniportal.com
+ADMIN_UIDS=iL8SjtYEODUpX778guh7UpNpPhz1
 ```
+
+`ADMIN_EMAILS` and `ADMIN_UIDS` are comma-separated allowlists for existing administrator accounts. Add the real Firebase Auth email or UID here if it differs from the seeded admin. These values are checked only after the backend verifies the Firebase ID token; they do not enable public admin signup. Configure `FIREBASE_SERVICE_ACCOUNT_PATH` to enable Admin SDK account enrollment, deletion, and direct password updates.
 
 ### 3. Run the Development Server
 ```bash

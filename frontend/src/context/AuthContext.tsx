@@ -19,7 +19,7 @@ interface AuthContextType {
   userProfile: UserProfileData | null;
   loading: boolean;
   loginWithEmail: (email: string, pass: string) => Promise<void>;
-  registerWithEmail: (email: string, pass: string, name: string, role?: "student" | "alumni" | "admin") => Promise<void>;
+  registerWithEmail: (email: string, pass: string, name: string, role?: "student" | "alumni") => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   updateUserProfilePhoto: (photoURL: string) => Promise<void>;
@@ -31,6 +31,21 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+function getErrorCode(error: unknown): string {
+  if (typeof error === "object" && error !== null && "code" in error) {
+    return String(error.code);
+  }
+  return "";
+}
+
+function getErrorMessage(error: unknown): string | undefined {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "object" && error !== null && "message" in error && typeof error.message === "string") {
+    return error.message;
+  }
+  return undefined;
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfileData | null>(null);
@@ -40,30 +55,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const fetchAndSyncProfile = async (currentUser: User) => {
     try {
       const existing = await getUserProfile(currentUser.uid);
-      if (existing) {
-        // If user logged in with a provider photo (e.g., Google) and Firestore has no photo yet, sync it
-        if (!existing.photoURL && currentUser.photoURL) {
-          existing.photoURL = currentUser.photoURL;
-          await saveUserProfile({ uid: currentUser.uid, photoURL: currentUser.photoURL });
-          saveProfileToBackend({ uid: currentUser.uid, photoURL: currentUser.photoURL }).catch(() => {});
-        }
-        setUserProfile(existing);
-      } else {
-        const initial: UserProfileData = {
-          uid: currentUser.uid,
-          email: currentUser.email || "",
-          displayName: currentUser.displayName || currentUser.email?.split("@")[0] || "User",
-          photoURL: currentUser.photoURL || "",
-          role: "student",
-          classYear: "",
-          department: "",
-          company: "",
-          bio: "",
-        };
-        await saveUserProfile(initial);
-        saveProfileToBackend(initial).catch(() => {});
-        setUserProfile(initial);
+      if (!existing) {
+        setUserProfile(null);
+        return;
       }
+
+      if (!existing.photoURL && currentUser.photoURL) {
+        existing.photoURL = currentUser.photoURL;
+        await saveUserProfile({ uid: currentUser.uid, photoURL: currentUser.photoURL });
+      }
+      await saveProfileToBackend(existing);
+      setUserProfile(existing);
     } catch (err) {
       console.error("Profile sync notice:", err);
     }
@@ -106,7 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Update Firestore user document
       await saveUserProfile({ uid: user.uid, photoURL });
       // Sync to backend database
-      saveProfileToBackend({ uid: user.uid, photoURL }).catch(() => {});
+      await saveProfileToBackend({ uid: user.uid, photoURL });
       // Update local state immediately
       setUserProfile((prev) => (prev ? { ...prev, photoURL } : null));
     } catch (err) {
@@ -125,7 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
       }
       await saveUserProfile({ uid: user.uid, ...details });
-      saveProfileToBackend({ uid: user.uid, ...details }).catch(() => {});
+      await saveProfileToBackend({ uid: user.uid, ...details });
       setUserProfile((prev) => (prev ? { ...prev, ...details } : null));
     } catch (err) {
       console.error("Failed to update profile details:", err);
@@ -138,22 +140,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const res = await signInWithEmailAndPassword(auth, email, pass);
       if (res.user) {
+        const existingProfile = await getUserProfile(res.user.uid);
+        if (!existingProfile) {
+          await signOut(auth);
+          setUser(null);
+          setUserProfile(null);
+          const profileMissingMsg = "We could not find a saved role for this account. Ask an administrator to restore the profile.";
+          setError(profileMissingMsg);
+          throw new Error(profileMissingMsg);
+        }
+        await saveProfileToBackend(existingProfile);
         await fetchAndSyncProfile(res.user);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Login Error:", err);
-      if (err.code === "auth/invalid-credential" || err.code === "auth/wrong-password" || err.code === "auth/user-not-found") {
+      const code = getErrorCode(err);
+      const message = getErrorMessage(err);
+      if (code === "auth/invalid-credential" || code === "auth/wrong-password" || code === "auth/user-not-found") {
         setError("Invalid email or password. Please check your details or register.");
-      } else if (err.code === "auth/invalid-api-key" || err.code === "auth/api-key-not-valid") {
+      } else if (code === "auth/invalid-api-key" || code === "auth/api-key-not-valid") {
         setError("Authentication service is temporarily unavailable. Please try again later.");
       } else {
-        setError(err.message || "Failed to sign in.");
+        setError(message || "Failed to sign in.");
       }
       throw err;
     }
   };
 
-  const registerWithEmail = async (email: string, pass: string, name: string, role: "student" | "alumni" | "admin" = "student") => {
+  const registerWithEmail = async (email: string, pass: string, name: string, role: "student" | "alumni" = "student") => {
     setError(null);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
@@ -169,17 +183,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           role: role,
         };
         await saveUserProfile(newProfile);
-        saveProfileToBackend(newProfile).catch(() => {});
+        await saveProfileToBackend(newProfile);
         setUserProfile(newProfile);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Register Error:", err);
-      if (err.code === "auth/email-already-in-use") {
+      const code = getErrorCode(err);
+      const message = getErrorMessage(err);
+      if (code === "auth/email-already-in-use") {
         setError("This email is already registered. Please log in instead.");
-      } else if (err.code === "auth/weak-password") {
+      } else if (code === "auth/weak-password") {
         setError("Password should be at least 6 characters long.");
       } else {
-        setError(err.message || "Failed to register account.");
+        setError(message || "Failed to register account.");
       }
       throw err;
     }
@@ -190,16 +206,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const res = await signInWithPopup(auth, googleProvider);
       if (res.user) {
-        await fetchAndSyncProfile(res.user);
+        const existingProfile = await getUserProfile(res.user.uid);
+        if (existingProfile) {
+          await fetchAndSyncProfile(res.user);
+        } else {
+          const initialProfile: UserProfileData = {
+            uid: res.user.uid,
+            email: res.user.email || "",
+            displayName: res.user.displayName || res.user.email?.split("@")[0] || "User",
+            photoURL: res.user.photoURL || "",
+            role: "student",
+            classYear: "",
+            department: "",
+            company: "",
+            bio: "",
+          };
+          await saveUserProfile(initialProfile);
+          await saveProfileToBackend(initialProfile);
+          setUserProfile(initialProfile);
+        }
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Google Auth Error:", err);
-      if (err.code === "auth/popup-closed-by-user") {
+      const code = getErrorCode(err);
+      const message = getErrorMessage(err);
+      if (code === "auth/popup-closed-by-user") {
         setError("Google sign-in window was closed before completion.");
-      } else if (err.code === "auth/unauthorized-domain") {
+      } else if (code === "auth/unauthorized-domain") {
         setError("Authentication domain is not authorized. Please check your settings.");
       } else {
-        setError(err.message || "Failed to sign in with Google.");
+        setError(message || "Failed to sign in with Google.");
       }
       throw err;
     }
@@ -211,9 +247,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await signOut(auth);
       setUser(null);
       setUserProfile(null);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Signout Error:", err);
-      setError(err.message || "Failed to sign out.");
+      setError(getErrorMessage(err) || "Failed to sign out.");
     }
   };
 

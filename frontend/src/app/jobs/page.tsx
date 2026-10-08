@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, type Dispatch, type SetStateAction } from "react";
 import Link from "next/link";
 import LayoutWrapper from "@/components/LayoutWrapper";
 import { Job, Application } from "@/data/mockData";
@@ -12,9 +12,24 @@ import {
 } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 
+async function loadApplicantApplications(
+  setApplications: Dispatch<SetStateAction<Application[]>>,
+  setIsRefreshing: Dispatch<SetStateAction<boolean>>
+) {
+  setIsRefreshing(true);
+  try {
+    setApplications(await fetchApplicationsForApplicant());
+  } catch (error) {
+    console.error("Failed to load user applications:", error);
+  } finally {
+    setIsRefreshing(false);
+  }
+}
+
 export default function JobsPage() {
   const { userProfile, user } = useAuth();
   const isAlumni = userProfile?.role === "alumni";
+  const isStudent = userProfile?.role === "student";
 
   const [activeTab, setActiveTab] = useState<"browse" | "applied">("browse");
   const [searchQuery, setSearchQuery] = useState("");
@@ -23,42 +38,17 @@ export default function JobsPage() {
   // Dynamic lists in state
   const [jobs, setJobs] = useState<Job[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [isRefreshingApps, setIsRefreshingApps] = useState(false);
 
   useEffect(() => {
-    async function loadJobs() {
-      try {
-        const loadedJobs = await fetchJobs();
-        setJobs(loadedJobs);
-      } catch (err) {
-        console.error("Failed to load jobs:", err);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-    loadJobs();
+    fetchJobs().then(setJobs).catch((err) => console.error("Failed to load jobs:", err));
   }, []);
 
-  const loadUserApps = async () => {
-    const uid = userProfile?.uid || user?.uid || "";
-    const email = userProfile?.email || user?.email || "";
-    if (uid || email) {
-      setIsRefreshingApps(true);
-      try {
-        const userApps = await fetchApplicationsForApplicant(uid, email);
-        setApplications(userApps);
-      } catch (e) {
-        console.error("Failed to load user applications:", e);
-      } finally {
-        setIsRefreshingApps(false);
-      }
-    }
-  };
-
   useEffect(() => {
-    loadUserApps();
-  }, [userProfile?.uid, user?.uid, userProfile?.email, user?.email, activeTab]);
+    if (user && isStudent) {
+      void loadApplicantApplications(setApplications, setIsRefreshingApps);
+    }
+  }, [user, isStudent]);
 
   // Apply modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -112,7 +102,7 @@ export default function JobsPage() {
   };
 
   const submitApplication = async () => {
-    if (!selectedJob) return;
+    if (!selectedJob || !user || !isStudent) return;
     setIsSubmitting(true);
 
     const appPayload: Omit<Application, "id"> = {
@@ -121,10 +111,10 @@ export default function JobsPage() {
       company: selectedJob.company,
       posterId: selectedJob.postedBy || "",
       posterEmail: selectedJob.postedByEmail || "",
-      applicantId: userProfile?.uid || "guest",
-      applicantName: userProfile?.displayName || userProfile?.email?.split("@")[0] || "Applicant",
-      applicantEmail: userProfile?.email || "",
-      applicantRole: userProfile?.role || "student",
+      applicantId: user.uid,
+      applicantName: userProfile.displayName || userProfile.email?.split("@")[0] || "Applicant",
+      applicantEmail: userProfile.email || user.email || "",
+      applicantRole: "student",
       resumeName: resumeName || "Resume.pdf",
       coverLetter: coverLetter.trim() || undefined,
       appliedDate: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
@@ -134,17 +124,13 @@ export default function JobsPage() {
     try {
       const createdApp = await submitJobApplicationViaApi(appPayload);
       setApplications((prev) => [createdApp, ...prev.filter((a) => a.id !== createdApp.id)]);
-    } catch (err) {
-      console.error("Failed to submit application:", err);
-      const fallbackApp: Application = {
-        id: `app-${Date.now()}`,
-        ...appPayload,
-      };
-      setApplications((prev) => [fallbackApp, ...prev]);
-    } finally {
-      setIsSubmitting(false);
       closeApplyModal();
       setActiveTab("applied");
+    } catch (err) {
+      console.error("Failed to submit application:", err);
+      alert(err instanceof Error ? err.message : "Unable to submit your application. Please try again.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -175,45 +161,33 @@ export default function JobsPage() {
 
     try {
       const savedJob = await createJobViaApi(jobData);
-      setJobs([savedJob, ...jobs]);
+      setJobs((previous) => [savedJob, ...previous]);
+      setIsCreateModalOpen(false);
+      setNewTitle("");
+      setNewCompany("");
+      setNewLocation("");
+      setNewType("Full-time");
+      setNewLevel("Entry Level");
     } catch (err) {
-      // Fallback local addition if network fails
-      const fallbackJob: Job = { id: `job-${Date.now()}`, ...jobData };
-      setJobs([fallbackJob, ...jobs]);
+      console.error("Failed to create job:", err);
+      alert(err instanceof Error ? err.message : "Unable to post this job. Please try again.");
     }
-
-    setIsCreateModalOpen(false);
-    
-    // Reset inputs
-    setNewTitle("");
-    setNewCompany("");
-    setNewLocation("");
-    setNewType("Full-time");
-    setNewLevel("Entry Level");
   };
 
   return (
     <LayoutWrapper>
-      <div className="flex flex-col w-full relative pb-10">
-        
-        {/* Header / Filters */}
-        <div className="px-4 py-4 sticky top-[64px] z-40 bg-surface/95 backdrop-blur-md pb-2 border-b border-surface-container">
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+      <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-6 pb-8">
+        <header className="flex flex-col gap-5 border-b border-[#d9e2e3] pb-5">
+            <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
               <div>
-                <h1 className="font-headline-lg-mobile text-headline-lg-mobile text-on-surface">
-                  Career Hub
-                </h1>
-                <p className="font-body-sm text-on-surface-variant text-xs mt-0.5">
-                  {isAlumni
-                    ? "As an alumnus, you have exclusive access to post jobs and referral opportunities."
-                    : "Explore and apply for career opportunities posted by verified alumni."}
-                </p>
+                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#54766f]">Community <span className="px-1.5 text-[#a1b2b0]">/</span> Careers</p>
+                <h1 className="mt-2 font-sans text-3xl font-semibold tracking-tight text-[#142f38] sm:text-4xl">Career opportunities</h1>
+                <p className="mt-2 text-sm text-[#63777d]">{isAlumni ? "Share an opening or review candidates from your workspace." : "Explore roles shared by alumni across the network."}</p>
               </div>
               {isAlumni && (
                 <button
                   onClick={() => setIsCreateModalOpen(true)}
-                  className="self-start sm:self-auto bg-primary text-on-primary px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm hover:bg-primary/90 transition-all cursor-pointer"
+                  className="inline-flex min-h-11 items-center gap-2 self-start rounded-md bg-[#173c42] px-4 text-sm font-semibold text-white transition hover:bg-[#21525a] sm:self-auto"
                 >
                   <span className="material-symbols-outlined text-[16px]">add</span>
                   Post a Job
@@ -222,37 +196,28 @@ export default function JobsPage() {
             </div>
             
             {/* Tab switch wrapper */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-              <div className="flex bg-surface-container rounded-full p-1 relative shadow-sm max-w-md flex-1">
-                <div
-                  className="absolute inset-y-1 left-1 bg-surface rounded-full shadow-sm transition-transform duration-300 ease-in-out"
-                  style={{
-                    width: "calc(50% - 4px)",
-                    transform: activeTab === "browse" ? "translateX(0)" : "translateX(100%)",
-                  }}
-                ></div>
+            <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+              <div className="flex gap-5 border-b border-[#d9e2e3] sm:border-0">
                 <button
                   onClick={() => setActiveTab("browse")}
-                  className={`flex-1 relative z-10 py-2 text-center font-label-md text-label-md transition-colors font-bold cursor-pointer ${
-                    activeTab === "browse" ? "text-on-surface" : "text-on-surface-variant"
-                  }`}
+                  className={`min-h-10 border-b-2 px-1 text-sm font-semibold transition-colors ${activeTab === "browse" ? "border-[#24635d] text-[#205b55]" : "border-transparent text-[#788a8e] hover:text-[#24444b]"}`}
                 >
                   Browse Jobs
                 </button>
-                <button
-                  onClick={() => setActiveTab("applied")}
-                  className={`flex-1 relative z-10 py-2 text-center font-label-md text-label-md transition-colors font-bold cursor-pointer ${
-                    activeTab === "applied" ? "text-on-surface" : "text-on-surface-variant"
-                  }`}
-                >
-                  My Applications {applications.length > 0 && `(${applications.length})`}
-                </button>
+                {isStudent && (
+                  <button
+                    onClick={() => setActiveTab("applied")}
+                    className={`min-h-10 border-b-2 px-1 text-sm font-semibold transition-colors ${activeTab === "applied" ? "border-[#24635d] text-[#205b55]" : "border-transparent text-[#788a8e] hover:text-[#24444b]"}`}
+                  >
+                    My Applications {applications.length > 0 && `(${applications.length})`}
+                  </button>
+                )}
               </div>
 
               {isAlumni && (
                 <Link
                   href="/alumni"
-                  className="bg-primary/10 hover:bg-primary text-primary hover:text-on-primary transition-all px-4 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border border-primary/20 shrink-0 shadow-sm"
+                  className="inline-flex min-h-10 items-center gap-2 text-xs font-semibold text-[#24635d] hover:underline"
                 >
                   <span className="material-symbols-outlined text-[18px]">group</span>
                   <span>Review Candidate Applicants</span>
@@ -262,26 +227,26 @@ export default function JobsPage() {
 
             {/* Search & Filters */}
             {activeTab === "browse" && (
-              <div className="flex items-center gap-2 mt-2 overflow-x-auto pb-2 scrollbar-hide snap-x" style={{ scrollbarWidth: "none" }}>
-                <div className="flex-none snap-start relative group w-64">
-                  <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[20px]">
+              <div className="grid gap-3 sm:grid-cols-[minmax(240px,1fr)_auto]">
+                <div className="relative">
+                  <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#72868a] text-[20px]">
                     search
                   </span>
                   <input
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-surface-container-highest text-on-surface placeholder:text-on-surface-variant/70 font-body-sm rounded-lg pl-10 pr-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:bg-surface transition-all"
+                    className="min-h-11 w-full rounded-md border border-[#cbd8d9] bg-white pl-10 pr-4 text-sm text-[#18343c] outline-none placeholder:text-[#879599] focus:border-[#458a7c] focus:ring-2 focus:ring-[#458a7c]/20"
                     placeholder="Search roles, companies..."
                     type="text"
                   />
                 </div>
 
                 {/* Job type dropdown */}
-                <div className="relative snap-start flex-none">
+                <div className="relative">
                   <select
                     value={selectedJobType}
                     onChange={(e) => setSelectedJobType(e.target.value)}
-                    className="appearance-none bg-surface-container-highest text-on-surface font-label-sm pl-8 pr-8 py-2 rounded-lg hover:bg-surface-container-high transition-colors outline-none cursor-pointer"
+                    className="min-h-11 appearance-none rounded-md border border-[#cbd8d9] bg-white pl-9 pr-9 text-sm text-[#29474e] outline-none focus:border-[#458a7c]"
                   >
                     {jobTypes.map((type) => (
                       <option key={type} value={type}>
@@ -298,31 +263,19 @@ export default function JobsPage() {
                 </div>
               </div>
             )}
-          </div>
-        </div>
+        </header>
 
         {/* Tab content: Browse Jobs */}
         {activeTab === "browse" && (
-          <div className="px-4 py-4 flex flex-col gap-4 relative z-0">
+          <section aria-label="Job results" className="divide-y divide-[#dfe7e7] border-b border-[#d9e2e3]">
             {filteredJobs.map((job) => {
               return (
                 <div
                   key={job.id}
-                  className={`rounded-2xl p-6 flex flex-col gap-4 shadow-sm relative overflow-hidden group hover:shadow-md transition-all duration-300 ${
-                    job.featured
-                      ? "bg-surface-container border-l-4 border-secondary shadow-[0_4px_12px_rgba(214,158,46,0.08)]"
-                      : "bg-surface-container-lowest"
-                  }`}
+                  className={`grid gap-4 py-5 transition-colors hover:bg-white/60 md:grid-cols-[minmax(0,1fr)_auto] md:items-center ${job.featured ? "border-l-2 border-[#a45d37] pl-4" : ""}`}
                 >
-                  {job.featured && (
-                    <div className="absolute top-0 right-0 p-2.5 bg-secondary text-on-secondary rounded-bl-xl font-label-sm shadow-sm z-10 flex items-center gap-1 text-[11px] font-bold">
-                      <span className="material-symbols-outlined text-[14px] font-fill">star</span>
-                      Featured
-                    </div>
-                  )}
-
-                  <div className="flex items-start gap-4 z-10 pr-16">
-                    <div className={`w-12 h-12 rounded-lg ${job.logoColorClass} flex items-center justify-center shadow-sm shrink-0 overflow-hidden font-bold`}>
+                  <div className="flex min-w-0 items-start gap-4">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md bg-[#e0eeea] font-semibold text-[#245e58]">
                       {job.logoUrl ? (
                         <img className="w-full h-full object-cover" src={job.logoUrl} alt={job.company} />
                       ) : (
@@ -330,57 +283,45 @@ export default function JobsPage() {
                       )}
                     </div>
                     
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-headline-md text-headline-md text-on-surface line-clamp-1 group-hover:text-primary transition-colors">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2"><h3 className="truncate text-base font-semibold text-[#17343b]">
                         {job.title}
-                      </h3>
-                      <p className="font-body-sm text-on-surface-variant mt-0.5">
-                        {job.company} • {job.location}
-                      </p>
+                      </h3>{job.featured && <span className="text-[10px] font-bold uppercase tracking-wide text-[#a45d37]">Featured</span>}</div>
+                      <p className="mt-1 text-sm text-[#718287]">{job.company} <span className="px-1">·</span> {job.location}</p>
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap gap-2 z-10">
-                    <span className="bg-primary-fixed text-on-primary-fixed px-2 py-0.5 rounded font-label-sm text-[11px]">
+                  <div className="flex flex-wrap items-center gap-3 pl-16 md:pl-0">
+                    <span className="text-xs font-semibold text-[#355a60]">
                       {job.type}
                     </span>
-                    <span className="bg-surface-container-highest text-on-surface px-2 py-0.5 rounded font-label-sm text-[11px]">
+                    <span className="text-xs text-[#718287]">
                       {job.level}
                     </span>
                     {job.referral && (
-                      <span className="bg-secondary-container/20 text-on-secondary-container px-2 py-0.5 rounded font-label-sm text-[11px] flex items-center gap-0.5 font-bold">
-                        <span className="material-symbols-outlined text-[12px] font-fill">people</span>
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#a45d37]">
+                        <span className="material-symbols-outlined text-[14px]">people</span>
                         Alumni Referral
                       </span>
                     )}
-                  </div>
-
-                  <div className="flex items-center justify-between mt-2 z-10 pt-2 border-t border-surface-container-low">
-                    <span className="font-body-sm text-error flex items-center gap-1 text-[12px] font-medium">
-                      <span className="material-symbols-outlined text-[16px]">schedule</span>
-                      {job.deadline}
-                    </span>
-                    <button
-                      onClick={() => openApplyModal(job)}
-                      className="bg-primary text-on-primary hover:bg-primary/95 px-5 py-2 rounded-lg font-label-md shadow-sm transition-all active:scale-95 font-bold cursor-pointer"
-                    >
-                      Apply
-                    </button>
+                    <span className="ml-auto text-xs text-[#849398]">{job.deadline}</span>
+                    {isStudent ? (
+                      <button
+                        onClick={() => openApplyModal(job)}
+                        className="min-h-9 rounded-md bg-[#205b55] px-4 text-xs font-semibold text-white transition hover:bg-[#174b46]"
+                      >
+                        Apply
+                      </button>
+                    ) : !user ? (
+                      <Link href="/" className="text-xs font-semibold text-[#24635d] hover:underline">Sign in to apply</Link>
+                    ) : null}
                   </div>
                 </div>
               );
             })}
 
-            {filteredJobs.length === 0 && (
-              <div className="text-center py-12 bg-surface-container-lowest rounded-2xl shadow-sm border border-dashed border-outline-variant/30 mt-4">
-                <span className="material-symbols-outlined text-[48px] text-outline opacity-40">work_off</span>
-                <p className="font-headline-md text-on-surface mt-2">No Jobs Found</p>
-                <p className="font-body-sm text-on-surface-variant mt-1">
-                  Try tweaking your search inputs or filters.
-                </p>
-              </div>
-            )}
-          </div>
+            {filteredJobs.length === 0 && <p className="py-12 text-center text-sm text-[#718287]">No jobs match those filters. Try a different search.</p>}
+          </section>
         )}
 
         {/* Tab content: My Applications */}
@@ -392,7 +333,7 @@ export default function JobsPage() {
                 <p className="text-xs text-on-surface-variant">Live review decisions from alumni job posters</p>
               </div>
               <button
-                onClick={loadUserApps}
+                onClick={() => void loadApplicantApplications(setApplications, setIsRefreshingApps)}
                 disabled={isRefreshingApps}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-xs font-bold text-on-surface transition-all cursor-pointer shadow-sm disabled:opacity-50"
                 title="Check latest status"
@@ -528,19 +469,6 @@ export default function JobsPage() {
               </div>
             )}
           </div>
-        )}
-
-        {/* Floating Action Button (FAB) for posting a job - Alumni only */}
-        {isAlumni && (
-          <button
-            onClick={() => setIsCreateModalOpen(true)}
-            className="fixed bottom-20 right-4 w-14 h-14 bg-tertiary hover:bg-tertiary/90 text-on-tertiary rounded-full shadow-lg flex items-center justify-center hover:scale-105 active:scale-95 transition-all z-40 group cursor-pointer"
-            aria-label="Post a Job"
-          >
-            <span className="material-symbols-outlined text-[28px] group-hover:rotate-90 transition-transform duration-300">
-              add
-            </span>
-          </button>
         )}
 
         {/* Apply Modal */}
