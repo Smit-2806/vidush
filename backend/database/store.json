@@ -1,0 +1,178 @@
+{
+  "jobs": [
+    {
+      "id": "job-1791315306333",
+      "title": "Full Stack Intern",
+      "company": "TCS",
+      "location": "Gandhinagar",
+      "type": "Internship",
+      "level": "Entry Level",
+      "referral": false,
+      "featured": false,
+      "deadline": "Ends in 30 days",
+      "postedDate": "Just now",
+      "logoColorClass": "bg-surface-container",
+      "logoText": "TC",
+      "createdAt": "2026-10-06T19:35:06.333Z"
+    },
+    {
+      "id": "job-1791316121231",
+      "title": "intern",
+      "company": "TCS",
+      "location": "Gandhinagar",
+      "type": "Internship",
+      "level": "Entry Level",
+      "referral": false,
+      "featured": false,
+      "deadline": "Ends in 30 days",
+      "postedDate": "Just now",
+      "logoColorClass": "bg-surface-container",
+      "logoText": "TC",
+      "postedBy": "vqTDoFcsx9MrHXCF5Ig0Qx8e1D93",
+      "postedByName": "Bhati Suryaveersinh",
+      "postedByEmail": "suryaveersinh@gmail.com",
+      "createdAt": "2026-10-06T19:48:41.231Z"
+    }
+  ],
+  "events": [
+    {
+      "id": "eve-1791315021103",
+      "title": "MEET-UP 2k26",
+      "month": "Nov",
+      "day": "15",
+      "location": "LDRP-ITR",
+      "description": "",
+      "isVirtual": false,
+      "imageUrl": "https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&q=80&w=400",
+      "createdAt": "2026-10-06T19:30:21.103Z"
+    }
+  ],
+  "alumni": [],
+  "users": {
+    "iL8SjtYEODUpX778guh7UpNpPhz1": {
+      "uid": "iL8SjtYEODUpX778guh7UpNpPhz1",
+      "email": "admin@alumniportal.com",
+      "displayName": "Portal Administrator",
+      "role": "admin",
+      "department": "Administration",
+      "classYear": "Staff",
+      "photoURL": "",
+      "bio": "System Administrator managing students, alumni, and portal resources.",
+      "createdAt": "2026-10-06T18:32:08.000Z",
+      "updatedAt": "2026-10-06T18:32:08.000Z"
+    },
+    "test-uid-123": {
+      "currentPassword": "UpdatedPassword789!",
+      "updatedAt": "2026-10-06T18:46:57.389Z",
+      "uid": "test-uid-123"
+    },
+    "vqTDoFcsx9MrHXCF5Ig0Qx8e1D93": {
+      "uid": "vqTDoFcsx9MrHXCF5Ig0Qx8e1D93",
+      "email": "suryaveersinh@gmail.com",
+      "displayName": "Bhati Suryaveersinh",
+      "role": "alumni",
+      "classYear": "2023",
+      "department": "Information Technology",
+      "company": "TCS",
+      "photoURL": "http://localhost:5000/uploads/avatar-1791318683791-130107504.jpg",
+      "bio": "Good student",
+      "updatedAt": "2026-10-06T20:31:25.942Z"
+    },
+    "RscIvWqmbdgK4wpmCNktCdJjwUn2": {
+      "uid": "RscIvWqmbdgK4wpmCNktCdJjwUn2",
+      "email": "patelhenishkumar1@gmail.com",
+      "displayName": "Patel Henish",
+      "role": "student",
+      "classYear": "2027",
+      "department": "Computer Engineering",
+      "company": "",
+      "photoURL": "",
+      "bio": "A1",
+      "updatedAt": "2026-10-06T20:36:19.657Z"
+    },
+    "mUanj93EfwO2L0uLufrhrXXhKyG3": {
+      "uid": "mUanj93EfwO2L0uLufrhrXXhKyG3",
+      "email": "ph7407607@gmail.com",
+      "displayName": "harshil",
+      "role": "alumni",
+      "classYear": "2027",
+      "department": "Computer Engineering",
+      "company": "google",
+      "photoURL": "",
+      "bio": "Proud Alumnus",
+      "updatedAt": "2026-10-07T17:16:39.475Z"
+    }
+  },
+  "applications": [
+    {
+      "id": "app-1791316057655",
+      "jobId": "gEI48bXt95Jjzv6h561j",
+      "jobTitle": "Full Stack Intern",
+      "company": "TCS",
+      "posterId": "",
+      "posterEmail": "",
+      "applicantId": "iL8SjtYEODUpX778guh7UpNpPhz1",
+      "applicantName": "Portal Administrator",
+      "applicantEmail": "admin@alumniportal.com",
+      "applicantRole": "admin",
+      "resumeName": "jhjhds.pdf",
+      "coverLetter": "",
+      "appliedDate": "Oct 7, 2026",
+      "status": "Under Review",
+      "createdAt": "2026-10-06T19:47:37.655Z"
+    },
+    {
+      "id": "app-1791316145333",
+      "jobId": "1JU3RWYv0LYCYfB7CdwA",
+      "jobTitle": "intern",
+      "company": "TCS",
+      "posterId": "vqTDoFcsx9MrHXCF5Ig0Qx8e1D93",
+      "posterEmail": "suryaveersinh@gmail.com",
+      "applicantId": "iL8SjtYEODUpX778guh7UpNpPhz1",
+      "applicantName": "Portal Administrator",
+      "applicantEmail": "admin@alumniportal.com",
+      "applicantRole": "admin",
+      "resumeName": "jhjhds.pdf",
+      "coverLetter": "",
+      "appliedDate": "Oct 7, 2026",
+      "status": "Rejected",
+      "createdAt": "2026-10-06T19:49:05.333Z",
+      "updatedAt": "2026-10-07T15:11:37.415Z"
+    },
+    {
+      "id": "app-1791385851953",
+      "jobId": "gEI48bXt95Jjzv6h561j",
+      "jobTitle": "Full Stack Intern",
+      "company": "TCS",
+      "posterId": "",
+      "posterEmail": "",
+      "applicantId": "RscIvWqmbdgK4wpmCNktCdJjwUn2",
+      "applicantName": "Patel Henish",
+      "applicantEmail": "patelhenishkumar1@gmail.com",
+      "applicantRole": "student",
+      "resumeName": "jhjhds.pdf",
+      "coverLetter": "",
+      "appliedDate": "Oct 7, 2026",
+      "status": "Under Review",
+      "createdAt": "2026-10-07T15:10:51.959Z"
+    },
+    {
+      "id": "app-1791385929693",
+      "jobId": "1JU3RWYv0LYCYfB7CdwA",
+      "jobTitle": "intern",
+      "company": "TCS",
+      "posterId": "vqTDoFcsx9MrHXCF5Ig0Qx8e1D93",
+      "posterEmail": "suryaveersinh@gmail.com",
+      "applicantId": "RscIvWqmbdgK4wpmCNktCdJjwUn2",
+      "applicantName": "Patel Henish",
+      "applicantEmail": "patelhenishkumar1@gmail.com",
+      "applicantRole": "student",
+      "resumeName": "jhjhds.pdf",
+      "coverLetter": "",
+      "appliedDate": "Oct 7, 2026",
+      "status": "Rejected",
+      "createdAt": "2026-10-07T15:12:09.700Z",
+      "updatedAt": "2026-10-07T16:34:52.002Z"
+    }
+  ]
+}

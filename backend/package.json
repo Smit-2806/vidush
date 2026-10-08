@@ -1,0 +1,29 @@
+{
+  "name": "alumni-portal-backend",
+  "version": "1.0.0",
+  "description": "Backend API and database service for VSITR Alumni Portal",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch-path=src src/server.js",
+    "seed": "node database/seed.js"
+  },
+  "keywords": [
+    "express",
+    "firebase",
+    "firestore",
+    "alumni-portal"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "multer": "^2.4.0"
+  },
+  "devDependencies": {
+    "morgan": "^1.10.0"
+  }
+}

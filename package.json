@@ -1,0 +1,14 @@
+{
+  "name": "alumni-portal",
+  "version": "1.0.0",
+  "private": true,
+  "description": "VSITR Alumni Portal with separated frontend and backend architectures",
+  "scripts": {
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev:backend": "npm --prefix backend run dev",
+    "build:frontend": "npm --prefix frontend run build",
+    "start:backend": "npm --prefix backend run start",
+    "seed:backend": "npm --prefix backend run seed",
+    "install:all": "npm --prefix frontend install && npm --prefix backend install"
+  }
+}
