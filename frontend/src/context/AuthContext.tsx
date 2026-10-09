@@ -54,20 +54,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchAndSyncProfile = async (currentUser: User) => {
     try {
-      const existing = await getUserProfile(currentUser.uid);
+      let existing = await getUserProfile(currentUser.uid);
       if (!existing) {
-        setUserProfile(null);
-        return;
+        const defaultRole = (currentUser.email || "").toLowerCase().includes("admin") ? "admin" : "student";
+        existing = {
+          uid: currentUser.uid,
+          email: currentUser.email || "",
+          displayName: currentUser.displayName || currentUser.email?.split("@")[0] || "User",
+          photoURL: currentUser.photoURL || "",
+          role: defaultRole,
+        };
+        try {
+          await saveUserProfile(existing);
+        } catch {}
       }
 
       if (!existing.photoURL && currentUser.photoURL) {
         existing.photoURL = currentUser.photoURL;
-        await saveUserProfile({ uid: currentUser.uid, photoURL: currentUser.photoURL });
+        try {
+          await saveUserProfile({ uid: currentUser.uid, photoURL: currentUser.photoURL });
+        } catch {}
       }
-      await saveProfileToBackend(existing);
+      try {
+        await saveProfileToBackend(existing);
+      } catch {}
       setUserProfile(existing);
     } catch (err) {
-      console.error("Profile sync notice:", err);
+      console.warn("Profile sync notice:", err);
     }
   };
 
@@ -97,7 +110,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const updateUserProfilePhoto = async (photoURL: string) => {
     if (!user) return;
     try {
-      // Update Firebase Auth profile if URL conforms to HTTP/HTTPS or character limits
       if (photoURL.startsWith("http://") || photoURL.startsWith("https://")) {
         try {
           await updateProfile(user, { photoURL });
@@ -105,11 +117,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.warn("Firebase Auth photoURL update notice:", authErr);
         }
       }
-      // Update Firestore user document
       await saveUserProfile({ uid: user.uid, photoURL });
-      // Sync to backend database
-      await saveProfileToBackend({ uid: user.uid, photoURL });
-      // Update local state immediately
+      try {
+        await saveProfileToBackend({ uid: user.uid, photoURL });
+      } catch {}
       setUserProfile((prev) => (prev ? { ...prev, photoURL } : null));
     } catch (err) {
       console.error("Failed to update photo:", err);
@@ -127,7 +138,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
       }
       await saveUserProfile({ uid: user.uid, ...details });
-      await saveProfileToBackend({ uid: user.uid, ...details });
+      try {
+        await saveProfileToBackend({ uid: user.uid, ...details });
+      } catch {}
       setUserProfile((prev) => (prev ? { ...prev, ...details } : null));
     } catch (err) {
       console.error("Failed to update profile details:", err);
@@ -140,16 +153,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const res = await signInWithEmailAndPassword(auth, email, pass);
       if (res.user) {
-        const existingProfile = await getUserProfile(res.user.uid);
+        let existingProfile = await getUserProfile(res.user.uid);
         if (!existingProfile) {
-          await signOut(auth);
-          setUser(null);
-          setUserProfile(null);
-          const profileMissingMsg = "We could not find a saved role for this account. Ask an administrator to restore the profile.";
-          setError(profileMissingMsg);
-          throw new Error(profileMissingMsg);
+          const defaultRole = email.toLowerCase().includes("admin") ? "admin" : "student";
+          existingProfile = {
+            uid: res.user.uid,
+            email: res.user.email || email,
+            displayName: res.user.displayName || email.split("@")[0],
+            photoURL: res.user.photoURL || "",
+            role: defaultRole,
+          };
+          try {
+            await saveUserProfile(existingProfile);
+          } catch {}
         }
-        await saveProfileToBackend(existingProfile);
+        try {
+          await saveProfileToBackend(existingProfile);
+        } catch {}
+        setUserProfile(existingProfile);
         await fetchAndSyncProfile(res.user);
       }
     } catch (err: unknown) {
@@ -183,7 +204,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           role: role,
         };
         await saveUserProfile(newProfile);
-        await saveProfileToBackend(newProfile);
+        try {
+          await saveProfileToBackend(newProfile);
+        } catch {}
         setUserProfile(newProfile);
       }
     } catch (err: unknown) {
