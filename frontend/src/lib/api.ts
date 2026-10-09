@@ -144,17 +144,21 @@ export async function createAlumniViaApi(alumniData: Omit<Alumni, "id">): Promis
 }
 
 /**
- * Sync an authenticated user's profile to the backend store
+ * Sync an authenticated user's profile to the backend store (non-blocking fallback)
  */
 export async function saveProfileToBackend(userProfile: Partial<UserProfileData> & { uid: string }) {
-  const res = await apiRequest(`${API_BASE_URL}/users`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(userProfile),
-  });
-  const result = await res.json();
-  if (!res.ok) throw new Error(result.message || "Unable to sync the account profile");
-  return result;
+  try {
+    const res = await apiRequest(`${API_BASE_URL}/users`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(userProfile),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (err) {
+    console.warn("Backend API unreachable for profile sync (running in cloud/standalone mode):", err);
+    return null;
+  }
 }
 
 /**
