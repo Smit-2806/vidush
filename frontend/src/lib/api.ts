@@ -11,12 +11,35 @@ import {
   UserProfileData,
 } from "./firestore";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+export function getApiBaseUrl(): string | null {
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname;
+    if (host !== "localhost" && host !== "127.0.0.1") {
+      // In cloud/Vercel production without a backend URL: use direct Firestore
+      return null;
+    }
+  }
+  return "http://localhost:5000/api";
+}
 
-async function apiRequest(url: string, init: RequestInit = {}): Promise<Response> {
+const API_BASE_URL = getApiBaseUrl() || "";
+
+async function apiRequest(path: string, init: RequestInit = {}): Promise<Response> {
+  const baseUrl = getApiBaseUrl();
+  if (!baseUrl) {
+    throw new Error("No backend API configured for cloud hosting");
+  }
+  let finalPath = path;
+  if (finalPath.startsWith("http://localhost:5000/api")) {
+    finalPath = finalPath.replace("http://localhost:5000/api", baseUrl);
+  }
   const token = await auth.currentUser?.getIdToken();
   const headers = new Headers(init.headers);
   if (token && !headers.has("Authorization")) headers.set("Authorization", `Bearer ${token}`);
+  const url = finalPath.startsWith("http") ? finalPath : `${baseUrl}${finalPath.startsWith("/") ? finalPath : `/${finalPath}`}`;
   return fetch(url, { ...init, headers });
 }
 
@@ -25,13 +48,13 @@ async function apiRequest(url: string, init: RequestInit = {}): Promise<Response
  */
 export async function fetchJobs(): Promise<Job[]> {
   try {
-    const res = await apiRequest(`${API_BASE_URL}/jobs`, { cache: "no-store" });
+    const res = await apiRequest("/jobs", { cache: "no-store" });
     if (res.ok) {
       const json = await res.json();
       if (Array.isArray(json.data)) return json.data;
     }
   } catch (err) {
-    console.warn("Jobs API unavailable; using Firestore read fallback:", err);
+    // Expected in cloud mode, silent fallback to Firestore
   }
   return getJobsFromFirestore();
 }
