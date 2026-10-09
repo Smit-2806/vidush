@@ -130,24 +130,23 @@ export async function fetchAlumni(): Promise<Alumni[]> {
     firestoreAlumni.forEach((a) => alumniMap.set(a.id, a));
   } catch {}
 
-  // 2. Fetch from Backend /api/alumni
-  try {
-    const res = await fetch(`${API_BASE_URL}/alumni`, { cache: "no-store" });
-    if (res.ok) {
-      const json = await res.json();
-      if (Array.isArray(json.data)) {
-        json.data.forEach((a: Alumni) => {
-          if (!alumniMap.has(a.id)) {
-            alumniMap.set(a.id, a);
-          }
-        });
+  // 2. Fetch from Backend /api/alumni only if backend URL is available
+  const baseUrl = getApiBaseUrl();
+  if (baseUrl) {
+    try {
+      const res = await fetch(`${baseUrl}/alumni`, { cache: "no-store" });
+      if (res.ok) {
+        const json = await res.json();
+        if (Array.isArray(json.data)) {
+          json.data.forEach((a: Alumni) => {
+            if (!alumniMap.has(a.id)) {
+              alumniMap.set(a.id, a);
+            }
+          });
+        }
       }
-    }
-  } catch {}
-
-  // 3. Fallback: also ensure any user with role === "alumni" from /api/users is included
-  try {
-  } catch {}
+    } catch {}
+  }
 
   return Array.from(alumniMap.values());
 }
@@ -156,22 +155,29 @@ export async function fetchAlumni(): Promise<Alumni[]> {
  * Create alumni: persists DIRECTLY to Cloud Firestore and syncs to backend API
  */
 export async function createAlumniViaApi(alumniData: Omit<Alumni, "id">): Promise<Alumni> {
-  const response = await apiRequest(`${API_BASE_URL}/alumni`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(alumniData),
-  });
-  const result = await response.json();
-  if (!response.ok) throw new Error(result.message || "Unable to create alumni profile");
-  return result.data as Alumni;
+  const baseUrl = getApiBaseUrl();
+  if (baseUrl) {
+    try {
+      await apiRequest("/alumni", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(alumniData),
+      });
+    } catch {}
+  }
+  return alumniData as Alumni;
 }
 
 /**
  * Sync an authenticated user's profile to the backend store (non-blocking fallback)
  */
 export async function saveProfileToBackend(userProfile: Partial<UserProfileData> & { uid: string }) {
+  const baseUrl = getApiBaseUrl();
+  if (!baseUrl) {
+    return null;
+  }
   try {
-    const res = await apiRequest(`${API_BASE_URL}/users`, {
+    const res = await apiRequest("/users", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(userProfile),
@@ -179,7 +185,6 @@ export async function saveProfileToBackend(userProfile: Partial<UserProfileData>
     if (!res.ok) return null;
     return await res.json();
   } catch (err) {
-    console.warn("Backend API unreachable for profile sync (running in cloud/standalone mode):", err);
     return null;
   }
 }
@@ -192,8 +197,10 @@ export async function fetchProfileFromBackend(uid: string): Promise<UserProfileD
     const firestoreProfile = await getUserProfile(uid);
     if (firestoreProfile) return firestoreProfile;
   } catch {}
+  const baseUrl = getApiBaseUrl();
+  if (!baseUrl) return null;
   try {
-    const res = await apiRequest(`${API_BASE_URL}/users/${uid}`, { cache: "no-store" });
+    const res = await apiRequest(`/users/${uid}`, { cache: "no-store" });
     if (res.ok) {
       const json = await res.json();
       return json.data;
