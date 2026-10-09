@@ -22,6 +22,7 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${manrope.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
       <head>
         <link
@@ -29,7 +30,10 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="min-h-full flex flex-col bg-background font-body-md text-on-background">
+      <body
+        className="min-h-full flex flex-col bg-background font-body-md text-on-background"
+        suppressHydrationWarning
+      >
         <AuthProvider>
           {children}
         </AuthProvider>
