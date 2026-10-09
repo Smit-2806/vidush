@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Header from "./Header";
+import BottomNav from "./BottomNav";
 import { useAuth } from "@/context/AuthContext";
 
 interface LayoutWrapperProps {
@@ -120,11 +121,12 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
       )}
 
       <Header onToggleSidebar={() => setIsSidebarOpen(true)} />
-      <main className="min-h-screen pt-16 pb-8 lg:ml-[258px]">
+      <main className="min-h-screen pt-16 pb-24 lg:pb-8 lg:ml-[258px]">
         <div className="mx-auto w-full max-w-[1580px] px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
           {children}
         </div>
       </main>
+      <BottomNav />
     </div>
   );
 }
