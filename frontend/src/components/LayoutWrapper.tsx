@@ -12,81 +12,143 @@ interface LayoutWrapperProps {
 }
 
 const roleHomes = {
-  admin: "/admin",
-  alumni: "/alumni",
+  admin:   "/admin",
+  alumni:  "/alumni",
   student: "/student",
 } as const;
+
+const navIconMap: Record<string, string> = {
+  admin:   "space_dashboard",
+  alumni:  "work_history",
+  student: "school",
+};
 
 export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   const pathname = usePathname();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { user, userProfile, logout } = useAuth();
   const role = userProfile?.role || "student";
-  const dashboardPath = roleHomes[role];
-  const dashboardLabel = role === "admin" ? "Member management" : role === "alumni" ? "Alumni dashboard" : "Student dashboard";
-  const displayName = userProfile?.displayName || user?.displayName || user?.email?.split("@")[0] || "Portal member";
+  const dashboardPath = roleHomes[role as keyof typeof roleHomes] ?? "/student";
+  const dashboardLabel =
+    role === "admin" ? "Member management"
+    : role === "alumni" ? "Alumni dashboard"
+    : "Student dashboard";
+  const displayName =
+    userProfile?.displayName ||
+    user?.displayName ||
+    user?.email?.split("@")[0] ||
+    "Portal member";
+
   const navItems = [
-    { label: dashboardLabel, href: dashboardPath, icon: role === "admin" ? "space_dashboard" : role === "alumni" ? "work_history" : "school", visible: true },
-    { label: "Alumni hiring", href: "/alumni", icon: "groups", visible: role === "admin" },
-    { label: "Directory", href: "/directory", icon: "people_alt", visible: true },
-    { label: "Job board", href: "/jobs", icon: "work_outline", visible: true },
-    { label: "Events", href: "/events", icon: "event", visible: true },
-    { label: "My profile", href: "/profile", icon: "account_circle", visible: true },
+    {
+      label: dashboardLabel,
+      href: dashboardPath,
+      icon: navIconMap[role] ?? "school",
+      visible: true,
+    },
+    { label: "Alumni hiring", href: "/alumni", icon: "groups",         visible: role === "admin" },
+    { label: "Directory",     href: "/directory", icon: "people_alt",  visible: true },
+    { label: "Job board",     href: "/jobs",      icon: "work_outline", visible: true },
+    { label: "Events",        href: "/events",    icon: "event",        visible: true },
+    { label: "My profile",    href: "/profile",   icon: "account_circle", visible: true },
   ].filter((item) => item.visible);
 
-  const navigation = (mobile = false) => (
-    <nav aria-label="Main navigation" className="flex flex-col gap-1">
+  const isActive = (href: string) =>
+    pathname === href || (href !== dashboardPath && pathname.startsWith(`${href}/`));
+
+  const closeSidebar = () => setIsSidebarOpen(false);
+
+  const NavLinks = ({ mobile = false }: { mobile?: boolean }) => (
+    <nav aria-label="Main navigation" className="flex flex-col gap-0.5">
       {navItems.map((item) => {
-        const isActive = pathname === item.href || (item.href !== dashboardPath && pathname.startsWith(`${item.href}/`));
+        const active = isActive(item.href);
         return (
           <Link
             key={`${item.label}-${item.href}`}
             href={item.href}
-            onClick={mobile ? () => setIsSidebarOpen(false) : undefined}
-            aria-current={isActive ? "page" : undefined}
-            className={`group flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm transition-colors ${
-              isActive
-                ? "bg-[#dcece7] font-semibold text-[#173d39]"
-                : "text-white/75 hover:bg-white/10 hover:text-white"
-            }`}
+            onClick={mobile ? closeSidebar : undefined}
+            aria-current={active ? "page" : undefined}
+            className={`
+              group flex min-h-[44px] items-center gap-3 rounded-xl px-3.5 text-sm font-medium
+              transition-all duration-150
+              ${active
+                ? "bg-[rgba(255,255,255,0.12)] text-white shadow-sm"
+                : "text-[#8aafc4] hover:bg-[rgba(255,255,255,0.07)] hover:text-white"
+              }
+            `}
           >
-            <span className={`material-symbols-outlined text-[19px] ${isActive ? "text-[#205b55]" : "text-white/60 group-hover:text-white"}`}>
+            <span
+              className={`
+                material-symbols-outlined text-[20px] shrink-0 transition-colors
+                ${active ? "text-[#60c4e8]" : "text-[#5a8aa0] group-hover:text-[#a0c8de]"}
+              `}
+            >
               {item.icon}
             </span>
-            <span>{item.label}</span>
+            <span className="truncate">{item.label}</span>
+            {active && (
+              <span className="ml-auto h-1.5 w-1.5 rounded-full bg-[#60c4e8] shrink-0" />
+            )}
           </Link>
         );
       })}
     </nav>
   );
 
-  const sidebarContent = (mobile = false) => (
-    <>
-      <Link href={dashboardPath} className="flex items-center gap-3 px-1 py-1" onClick={mobile ? () => setIsSidebarOpen(false) : undefined}>
-        <span className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg bg-white p-1.5">
+  const SidebarContent = ({ mobile = false }: { mobile?: boolean }) => (
+    <div className="flex h-full flex-col">
+      {/* Logo */}
+      <Link
+        href={dashboardPath}
+        onClick={mobile ? closeSidebar : undefined}
+        className="flex items-center gap-3 px-1 py-1 mb-6 rounded-xl hover:bg-[rgba(255,255,255,0.05)] transition-colors"
+      >
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white/10 p-1.5 ring-1 ring-white/20">
           <img src="/app_logo.png" alt="VSITR" className="h-full w-full object-contain" />
         </span>
         <span className="min-w-0">
-          <span className="block text-sm font-bold tracking-wide text-white">VSITR</span>
-          <span className="block text-[11px] text-white/55">Alumni network</span>
+          <span className="block text-sm font-bold tracking-wide text-white leading-tight">VSITR</span>
+          <span className="block text-[11px] text-[#5a8aa0] leading-tight mt-0.5">Alumni Network</span>
         </span>
       </Link>
 
-      <div className="mt-9 px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-white/40">
+      {/* Section label */}
+      <div className="px-1 mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-[#3d6070]">
         Workspace
       </div>
-      <div className="mt-2">{navigation(mobile)}</div>
 
-      <div className="mt-auto flex min-w-0 items-center gap-2 border-t border-white/10 pt-4">
-        <Link href="/profile" onClick={mobile ? () => setIsSidebarOpen(false) : undefined} className="flex min-w-0 flex-1 items-center gap-3 rounded-lg p-2 hover:bg-white/10">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#b9ddd5] text-sm font-bold text-[#143d3d]">
+      {/* Nav */}
+      <NavLinks mobile={mobile} />
+
+      {/* Spacer */}
+      <div className="mt-auto" />
+
+      {/* Divider */}
+      <div className="h-px bg-white/10 my-4" />
+
+      {/* User row */}
+      <div className="flex min-w-0 items-center gap-2">
+        <Link
+          href="/profile"
+          onClick={mobile ? closeSidebar : undefined}
+          className="flex min-w-0 flex-1 items-center gap-2.5 rounded-xl p-2 hover:bg-white/07 transition-colors group"
+        >
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#1e6080] text-sm font-bold text-white ring-2 ring-white/10">
             {userProfile?.photoURL || user?.photoURL ? (
-              <img src={userProfile?.photoURL || user?.photoURL || ""} alt="" className="h-full w-full object-cover" />
-            ) : displayName.slice(0, 1).toUpperCase()}
+              <img
+                src={userProfile?.photoURL || user?.photoURL || ""}
+                alt=""
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              displayName.slice(0, 1).toUpperCase()
+            )}
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-xs font-semibold text-white">{displayName}</span>
-            <span className="block text-[10px] capitalize text-white/50">{role}</span>
+            <span className="block truncate text-xs font-semibold text-white group-hover:text-[#60c4e8] transition-colors">
+              {displayName}
+            </span>
+            <span className="block text-[10px] capitalize text-[#5a8aa0]">{role}</span>
           </span>
         </Link>
         <button
@@ -94,38 +156,61 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
           aria-label="Sign out"
           title="Sign out"
           onClick={() => void logout()}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-white/55 hover:bg-white/10 hover:text-white"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[#5a8aa0] hover:bg-white/10 hover:text-white transition-all cursor-pointer"
         >
           <span className="material-symbols-outlined text-[18px]">logout</span>
         </button>
       </div>
-    </>
+    </div>
   );
 
   return (
-    <div className="min-h-screen bg-[#f3f6f7] text-on-surface">
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[258px] flex-col bg-[#112a32] px-4 py-5 lg:flex">
-        {sidebarContent()}
+    <div className="min-h-screen" style={{ background: "#f1f5f9" }}>
+      {/* Desktop sidebar */}
+      <aside
+        className="fixed inset-y-0 left-0 z-40 hidden w-[260px] lg:flex flex-col px-4 py-5"
+        style={{ background: "#0d2233" }}
+      >
+        <SidebarContent />
       </aside>
 
+      {/* Mobile sidebar overlay */}
       {isSidebarOpen && (
         <div className="fixed inset-0 z-[70] lg:hidden">
-          <button className="absolute inset-0 cursor-default bg-black/45" aria-label="Close navigation" onClick={() => setIsSidebarOpen(false)} />
-          <aside className="relative flex h-full w-[min(290px,85vw)] flex-col bg-[#112a32] px-4 py-5 shadow-2xl animate-slide-in">
-            <button className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-md text-white/70 hover:bg-white/10" aria-label="Close navigation" onClick={() => setIsSidebarOpen(false)}>
-              <span className="material-symbols-outlined">close</span>
+          {/* Backdrop */}
+          <button
+            className="absolute inset-0 cursor-default bg-black/50 backdrop-blur-sm"
+            aria-label="Close navigation"
+            onClick={closeSidebar}
+          />
+          {/* Drawer */}
+          <aside
+            className="relative flex h-full w-[min(280px,85vw)] flex-col px-4 py-5 shadow-2xl animate-slide-in"
+            style={{ background: "#0d2233" }}
+          >
+            <button
+              className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-lg text-white/60 hover:bg-white/10 transition-colors"
+              aria-label="Close navigation"
+              onClick={closeSidebar}
+            >
+              <span className="material-symbols-outlined text-[20px]">close</span>
             </button>
-            {sidebarContent(true)}
+            <SidebarContent mobile />
           </aside>
         </div>
       )}
 
+      {/* Header */}
       <Header onToggleSidebar={() => setIsSidebarOpen(true)} />
-      <main className="min-h-screen pt-16 pb-24 lg:pb-8 lg:ml-[258px]">
-        <div className="mx-auto w-full max-w-[1580px] px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
+
+      {/* Main content */}
+      <main className="min-h-screen pt-16 pb-24 lg:pb-8 lg:ml-[260px]">
+        <div className="mx-auto w-full max-w-[1580px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8 page-enter">
           {children}
         </div>
       </main>
+
+      {/* Bottom nav (mobile) */}
       <BottomNav />
     </div>
   );

@@ -12,6 +12,7 @@ import {
 import {
   getAuth,
   sendPasswordResetEmail,
+  sendEmailVerification,
 } from "firebase/auth";
 import { Job, EventItem, Alumni, EventRegistration } from "@/data/mockData";
 
@@ -27,6 +28,21 @@ export interface UserProfileData {
   bio?: string;
   createdAt?: unknown;
   updatedAt?: unknown;
+  status?: RegistrationStatus;
+  emailVerified?: boolean;
+  registration?: RegistrationDetails;
+  approvedBy?: string;
+  approvedAt?: unknown;
+  rejectedBy?: string;
+  rejectedAt?: unknown;
+  rejectionReason?: string;
+}
+
+export type RegistrationStatus = "PENDING" | "APPROVED" | "REJECTED";
+export type RegistrationDetails = Record<string, string | undefined>;
+
+export interface RegistrationRecord extends UserProfileData {
+  status: RegistrationStatus;
 }
 
 // Save or Update User Profile in Firestore
@@ -59,6 +75,48 @@ export async function getUserProfile(uid: string): Promise<UserProfileData | nul
     console.error("Error getting user profile:", error);
     return null;
   }
+}
+
+export async function createRegistration(
+  profile: UserProfileData & { status: "PENDING"; registration?: RegistrationDetails }
+) {
+  await setDoc(doc(db, "users", profile.uid), {
+    ...profile,
+    role: profile.role === "admin" ? "student" : profile.role,
+    emailVerified: false,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function listPendingRegistrations(): Promise<RegistrationRecord[]> {
+  const snapshot = await getDocs(query(collection(db, "users"), where("status", "==", "PENDING")));
+  return snapshot.docs.map((item) => item.data() as RegistrationRecord);
+}
+
+export async function updateRegistrationStatus(
+  uid: string,
+  status: "APPROVED" | "REJECTED",
+  adminUid: string,
+  rejectionReason = ""
+) {
+  await setDoc(doc(db, "users", uid), {
+    status,
+    ...(status === "APPROVED"
+      ? { approvedBy: adminUid, approvedAt: serverTimestamp() }
+      : { rejectedBy: adminUid, rejectedAt: serverTimestamp(), rejectionReason }),
+    updatedAt: serverTimestamp(),
+  }, { merge: true });
+}
+
+export async function syncEmailVerification(uid: string, emailVerified: boolean) {
+  await setDoc(doc(db, "users", uid), { emailVerified, updatedAt: serverTimestamp() }, { merge: true });
+}
+
+export async function sendVerificationEmail() {
+  const currentUser = getAuth().currentUser;
+  if (!currentUser) throw new Error("No authenticated user");
+  await sendEmailVerification(currentUser);
 }
 
 // Send official password reset email to member
@@ -171,5 +229,4 @@ export async function getAlumniFromFirestore(): Promise<Alumni[]> {
 
   return Array.from(alumniMap.values());
 }
-
 

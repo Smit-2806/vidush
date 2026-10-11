@@ -1,304 +1,66 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 
-export default function WelcomePage() {
+type Role = "student" | "alumni";
+
+export default function AuthenticationPage() {
   const router = useRouter();
-  const { user, userProfile, loading, loginWithEmail, registerWithEmail, error, clearError } = useAuth();
-
-  const [passwordVisible, setPasswordVisible] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [localError, setLocalError] = useState<string | null>(null);
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
-
+  const { user, userProfile, loginWithEmail, registerWithEmail, resetPassword, resendVerification, logout, error, clearError } = useAuth();
+  const [role, setRole] = useState<Role>("student");
+  const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
-  const [selectedRole, setSelectedRole] = useState<"student" | "alumni">("student");
+  const [fields, setFields] = useState<Record<string, string>>({});
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [forgot, setForgot] = useState(false);
 
-  const handleSignIn = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLocalError(null);
-    clearError();
-    setIsSubmitting(true);
+  const update = (key: string, value: string) => setFields((current) => ({ ...current, [key]: value }));
+  const fail = (value: unknown) => setMessage(value instanceof Error ? value.message : "Something went wrong.");
 
+  async function submit(event: FormEvent) {
+    event.preventDefault(); setBusy(true); setMessage(""); clearError();
     try {
-      await loginWithEmail(email, password);
-    } catch (err: unknown) {
-      setLocalError(err instanceof Error ? err.message : "Unable to sign in. Check your email and password.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+      if (forgot) { await resetPassword(email); setMessage("Password reset email sent."); setForgot(false); return; }
+      if (mode === "register") {
+        await registerWithEmail(email, password, name, role, fields);
+        setMessage("Registration submitted. Verify your email, then wait for admin approval.");
+        setMode("login");
+      } else {
+        await loginWithEmail(email, password);
+        router.push(role === "alumni" ? "/alumni" : "/student");
+      }
+    } catch (err) { fail(err); } finally { setBusy(false); }
+  }
 
-  const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLocalError(null);
-    clearError();
-    setIsSubmitting(true);
+  const input = "input";
+  return <main className="min-h-screen bg-[#0d2233] px-4 py-10 text-on-surface">
+    <div className="mx-auto grid min-h-[calc(100vh-5rem)] max-w-6xl items-center gap-10 lg:grid-cols-2">
+      <section className="hidden text-white lg:block"><p className="mb-4 text-sm font-bold uppercase tracking-[0.25em] text-[#8de2d7]">VSITR Alumni Portal</p><h1 className="max-w-xl text-5xl font-bold leading-tight">Your academic community, thoughtfully connected.</h1><p className="mt-6 max-w-lg text-lg text-[#c8dce8]">Create an account, verify your email, and let the administration review your registration before access is granted.</p><div className="mt-10 grid gap-3 text-sm text-[#c8dce8]"><p>✓ Firebase identity verification</p><p>✓ Student and Alumni registration review</p><p>✓ Approval-gated portal access</p></div></section>
+      <section className="rounded-3xl bg-white p-6 shadow-2xl sm:p-10">
+        <div className="mb-7"><p className="text-sm font-semibold text-secondary">Secure access</p><h2 className="mt-1 text-3xl font-bold">{forgot ? "Reset password" : mode === "login" ? "Welcome back" : `Register as ${role === "student" ? "a Student" : "an Alumni"}`}</h2></div>
+        {!forgot && <div className="mb-6 grid grid-cols-2 gap-2 rounded-xl bg-surface-container-low p-1"><button type="button" onClick={() => setRole("student")} className={`rounded-lg py-2 text-sm font-semibold ${role === "student" ? "bg-white shadow" : "text-on-surface-variant"}`}>Student</button><button type="button" onClick={() => setRole("alumni")} className={`rounded-lg py-2 text-sm font-semibold ${role === "alumni" ? "bg-white shadow" : "text-on-surface-variant"}`}>Alumni</button></div>}
+        {(error || message) && <div className={`mb-4 rounded-xl p-3 text-sm ${error ? "bg-error-container text-error" : "bg-success-container text-success"}`}>{error || message}</div>}
+        <form onSubmit={submit} className="space-y-4">
+          {mode === "register" && !forgot && <label className="block text-sm font-semibold">Full name<input className={input + " mt-1"} required value={name} onChange={(e) => setName(e.target.value)} /></label>}
+          <label className="block text-sm font-semibold">{role === "student" ? "College email" : "Personal email"}<input className={input + " mt-1"} type="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></label>
+          {!forgot && <label className="block text-sm font-semibold">Password<input className={input + " mt-1"} type="password" minLength={6} required value={password} onChange={(e) => setPassword(e.target.value)} /></label>}
+          {mode === "register" && role === "student" && <><Field label="Enrollment number" name="enrollmentNumber" update={update}/><Field label="Department" name="department" update={update}/><Field label="Degree / course" name="degree" update={update}/></>}
+          {mode === "register" && role === "alumni" && <><Field label="Phone number" name="phone" update={update}/><Field label="Enrollment number" name="enrollmentNumber" update={update}/><Field label="Department" name="department" update={update}/><Field label="Degree / course" name="degree" update={update}/><Field label="Graduation year" name="graduationYear" update={update}/><Field label="Current professional status" name="professionalStatus" update={update}/></>}
+          <button disabled={busy} className="btn btn-primary w-full">{busy ? "Please wait…" : forgot ? "Send reset email" : mode === "login" ? "Sign in" : "Submit registration"}</button>
+        </form>
+        <div className="mt-5 flex flex-wrap justify-between gap-3 text-sm text-secondary"><button type="button" onClick={() => { setForgot(!forgot); setMessage(""); }}> {forgot ? "Back to login" : "Forgot password?"}</button>{!forgot && <button type="button" onClick={() => { setMode(mode === "login" ? "register" : "login"); setMessage(""); }}>{mode === "login" ? "Create an account" : "Already registered? Sign in"}</button>}</div>
+        {user && <div className="mt-5 border-t pt-4 text-center text-sm"><button type="button" onClick={() => logout()} className="text-error">Sign out</button>{userProfile?.emailVerified === false && <button type="button" onClick={() => resendVerification()} className="ml-4 text-secondary">Resend verification</button>}</div>}
+        <p className="mt-6 text-center text-xs text-on-surface-variant">Administrator? Use the controlled <a href="/admin" className="font-semibold text-secondary">Admin Login</a>.</p>
+      </section>
+    </div>
+  </main>;
+}
 
-    try {
-      await registerWithEmail(email, password, name || email.split("@")[0], selectedRole);
-      await loginWithEmail(email, password);
-    } catch (err: unknown) {
-      setLocalError(err instanceof Error ? err.message : "Unable to create the account.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const activeError = error || localError;
-
-  useEffect(() => {
-    if (loading) {
-      return;
-    }
-
-    if (!user) {
-      return;
-    }
-
-    if (!userProfile) return;
-
-    router.push(userProfile.role === "admin" ? "/admin" : userProfile.role === "alumni" ? "/alumni" : "/student");
-  }, [user, userProfile, loading, router]);
-
-  return (
-    <main className="min-h-screen bg-[#f3f7f6] relative flex flex-col justify-center items-center px-4 py-8 sm:py-12 overflow-hidden selection:bg-[#dcece7] selection:text-[#173d39]">
-      {/* Subtle ambient light accents */}
-      <div className="absolute -top-36 -left-36 w-96 h-96 bg-[#d8eae5]/60 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-36 -right-36 w-96 h-96 bg-[#dfeaf0]/60 rounded-full blur-3xl pointer-events-none" />
-
-      <div className="relative z-10 w-full max-w-[480px] mx-auto flex flex-col items-center">
-        {/* Header branding */}
-        <div className="flex flex-col items-center text-center mb-6 sm:mb-8">
-          <div className="w-18 h-18 sm:w-20 sm:h-20 mb-3.5 rounded-2xl bg-white shadow-[0_8px_24px_-6px_rgba(20,50,55,0.08)] border border-[#e2eaec] flex items-center justify-center p-2.5 transition-transform duration-300 hover:scale-105">
-            <img alt="VSITR Logo" className="w-full h-full object-contain" src="/app_logo.png" />
-          </div>
-          <span className="text-[11px] font-bold tracking-[0.16em] uppercase text-[#61777d] mb-1">
-            Vishwabharati Institute of Technology
-          </span>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-[#112a32] tracking-tight">
-            Alumni Portal
-          </h1>
-          <p className="text-xs sm:text-sm text-[#5d737a] mt-1.5 max-w-[340px]">
-            Connect, mentor, and grow with your academic community.
-          </p>
-        </div>
-
-        {activeError && (
-          <div className="w-full mb-4 p-3.5 bg-red-50/90 border border-red-200/80 rounded-2xl text-red-700 text-xs sm:text-sm flex items-start gap-2.5 animate-fade-in shadow-xs">
-            <span className="material-symbols-outlined text-[18px] shrink-0 mt-0.5 text-red-600">error</span>
-            <div className="flex-1 leading-relaxed">{activeError}</div>
-            <button
-              type="button"
-              onClick={() => { setLocalError(null); clearError(); }}
-              className="text-red-500 hover:text-red-700 transition-colors p-0.5"
-              aria-label="Dismiss error"
-            >
-              <span className="material-symbols-outlined text-[16px]">close</span>
-            </button>
-          </div>
-        )}
-
-        {/* Main card */}
-        <div className="w-full bg-white/95 backdrop-blur-md rounded-3xl p-6 sm:p-8 shadow-[0_16px_40px_-12px_rgba(17,42,50,0.08)] border border-[#e2e8ea]">
-          {/* Segmented Tab Switcher */}
-          <div className="mb-6 grid grid-cols-2 p-1 rounded-2xl bg-[#edf3f3] border border-[#e2ecea]">
-            <button
-              type="button"
-              onClick={() => setMode("signin")}
-              className={`min-h-[40px] rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 cursor-pointer flex items-center justify-center ${
-                mode === "signin"
-                  ? "bg-[#1d524d] text-white shadow-sm"
-                  : "text-[#526a70] hover:text-[#173d39]"
-              }`}
-            >
-              Sign In
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode("signup")}
-              className={`min-h-[40px] rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 cursor-pointer flex items-center justify-center ${
-                mode === "signup"
-                  ? "bg-[#1d524d] text-white shadow-sm"
-                  : "text-[#526a70] hover:text-[#173d39]"
-              }`}
-            >
-              Sign Up
-            </button>
-          </div>
-
-          {mode === "signin" ? (
-            <form onSubmit={handleSignIn} className="flex flex-col gap-4 sm:gap-5">
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="email" className="text-xs font-semibold text-[#304850]">
-                  Email Address
-                </label>
-                <input
-                  required
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@example.com"
-                  className="w-full h-12 bg-[#fafcfc] text-[#142e36] text-sm px-4 rounded-xl border border-[#d6e2e4] focus:bg-white focus:border-[#205b55] focus:ring-3 focus:ring-[#205b55]/15 focus:outline-none transition-all"
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="password" className="text-xs font-semibold text-[#304850]">
-                  Password
-                </label>
-                <div className="relative">
-                  <input
-                    required
-                    id="password"
-                    type={passwordVisible ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full h-12 bg-[#fafcfc] text-[#142e36] text-sm px-4 pr-11 rounded-xl border border-[#d6e2e4] focus:bg-white focus:border-[#205b55] focus:ring-3 focus:ring-[#205b55]/15 focus:outline-none transition-all"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setPasswordVisible(!passwordVisible)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 h-8 w-8 flex items-center justify-center text-[#698188] hover:text-[#1d524d] transition-colors cursor-pointer rounded-lg"
-                    aria-label="Toggle password visibility"
-                  >
-                    <span className="material-symbols-outlined text-[19px]">
-                      {passwordVisible ? "visibility" : "visibility_off"}
-                    </span>
-                  </button>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full mt-2 h-12 bg-[#1d524d] hover:bg-[#153f3b] text-white text-sm font-bold rounded-xl shadow-sm hover:shadow transition-all duration-200 active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
-              >
-                {isSubmitting ? (
-                  <>
-                    <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    <span>Signing in...</span>
-                  </>
-                ) : (
-                  <span>Sign In</span>
-                )}
-              </button>
-            </form>
-          ) : (
-            <form onSubmit={handleSignUp} className="flex flex-col gap-4 sm:gap-5">
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="signup-name" className="text-xs font-semibold text-[#304850]">
-                  Full Name
-                </label>
-                <input
-                  required
-                  id="signup-name"
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Your full name"
-                  className="w-full h-12 bg-[#fafcfc] text-[#142e36] text-sm px-4 rounded-xl border border-[#d6e2e4] focus:bg-white focus:border-[#205b55] focus:ring-3 focus:ring-[#205b55]/15 focus:outline-none transition-all"
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="signup-email" className="text-xs font-semibold text-[#304850]">
-                  Email Address
-                </label>
-                <input
-                  required
-                  id="signup-email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@example.com"
-                  className="w-full h-12 bg-[#fafcfc] text-[#142e36] text-sm px-4 rounded-xl border border-[#d6e2e4] focus:bg-white focus:border-[#205b55] focus:ring-3 focus:ring-[#205b55]/15 focus:outline-none transition-all"
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="signup-password" className="text-xs font-semibold text-[#304850]">
-                  Password
-                </label>
-                <div className="relative">
-                  <input
-                    required
-                    id="signup-password"
-                    type={passwordVisible ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Create a strong password"
-                    className="w-full h-12 bg-[#fafcfc] text-[#142e36] text-sm px-4 pr-11 rounded-xl border border-[#d6e2e4] focus:bg-white focus:border-[#205b55] focus:ring-3 focus:ring-[#205b55]/15 focus:outline-none transition-all"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setPasswordVisible(!passwordVisible)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 h-8 w-8 flex items-center justify-center text-[#698188] hover:text-[#1d524d] transition-colors cursor-pointer rounded-lg"
-                    aria-label="Toggle password visibility"
-                  >
-                    <span className="material-symbols-outlined text-[19px]">
-                      {passwordVisible ? "visibility" : "visibility_off"}
-                    </span>
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="signup-role" className="text-xs font-semibold text-[#304850]">
-                  Select Your Role
-                </label>
-                <div className="relative">
-                  <select
-                    id="signup-role"
-                    value={selectedRole}
-                    onChange={(e) => setSelectedRole(e.target.value as "student" | "alumni")}
-                    className="w-full h-12 bg-[#fafcfc] text-[#142e36] text-sm px-4 pr-10 rounded-xl border border-[#d6e2e4] focus:bg-white focus:border-[#205b55] focus:ring-3 focus:ring-[#205b55]/15 focus:outline-none transition-all appearance-none cursor-pointer"
-                  >
-                    <option value="student">Student</option>
-                    <option value="alumni">Alumni</option>
-                  </select>
-                  <span className="material-symbols-outlined absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-[#698188] text-[20px]">
-                    expand_more
-                  </span>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full mt-2 h-12 bg-[#1d524d] hover:bg-[#153f3b] text-white text-sm font-bold rounded-xl shadow-sm hover:shadow transition-all duration-200 active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
-              >
-                {isSubmitting ? (
-                  <>
-                    <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    <span>Creating account...</span>
-                  </>
-                ) : (
-                  <span>Create Account</span>
-                )}
-              </button>
-            </form>
-          )}
-
-          {/* Footer role helper */}
-          <div className="mt-6 pt-4 border-t border-[#edf2f3] flex items-start gap-2.5 text-[#546d74] text-xs leading-relaxed bg-[#f6faf9] p-3.5 rounded-2xl border border-[#e4eeec]">
-            <span className="material-symbols-outlined text-[18px] text-[#205b55] shrink-0 mt-0.5">
-              badge
-            </span>
-            <p>
-              {mode === "signin"
-                ? "Your saved account role determines which dashboard opens after sign-in."
-                : "Choose Student or Alumni when creating your account. Admin accounts are provisioned by an administrator."}
-            </p>
-          </div>
-        </div>
-      </div>
-    </main>
-  );
+function Field({ label, name, update }: { label: string; name: string; update: (key: string, value: string) => void }) {
+  return <label className="block text-sm font-semibold">{label}<input className="input mt-1" required onChange={(e) => update(name, e.target.value)} /></label>;
 }

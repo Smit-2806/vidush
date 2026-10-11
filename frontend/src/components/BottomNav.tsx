@@ -3,39 +3,81 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
+
+const navItems = [
+  { name: "Home",      path: "/home",      icon: "home" },
+  { name: "Directory", path: "/directory", icon: "person_search" },
+  { name: "Jobs",      path: "/jobs",      icon: "work" },
+  { name: "Events",    path: "/events",    icon: "calendar_month" },
+  { name: "Profile",   path: "/profile",   icon: "account_circle" },
+];
 
 export default function BottomNav() {
   const pathname = usePathname();
+  const { userProfile } = useAuth();
+  const role = userProfile?.role;
 
-  const navItems = [
-    { name: "Home", path: "/home", icon: "home" },
+  // Show dashboard shortcut on mobile for logged-in users
+  const dashPath =
+    role === "admin" ? "/admin" : role === "alumni" ? "/alumni" : "/student";
+  const dashIcon =
+    role === "admin" ? "space_dashboard" : role === "alumni" ? "work_history" : "school";
+
+  const items = [
+    { name: "Dash",      path: dashPath,     icon: dashIcon },
     { name: "Directory", path: "/directory", icon: "person_search" },
-    { name: "Jobs", path: "/jobs", icon: "work" },
-    { name: "Events", path: "/events", icon: "calendar_month" },
-    { name: "Profile", path: "/profile", icon: "account_circle" },
+    { name: "Jobs",      path: "/jobs",      icon: "work" },
+    { name: "Events",    path: "/events",    icon: "calendar_month" },
+    { name: "Profile",   path: "/profile",   icon: "account_circle" },
   ];
 
   return (
-    <nav className="fixed bottom-0 inset-x-0 z-40 pb-safe bg-white/90 backdrop-blur-xl border-t border-[#e2eaec] shadow-[0_-4px_24px_rgba(17,42,50,0.06)] lg:hidden">
-      <div className="flex justify-between items-center h-16 px-2 max-w-lg mx-auto">
-        {navItems.map((item) => {
-          const isActive = pathname === item.path || (item.path !== "/home" && pathname.startsWith(item.path));
+    <nav
+      className="fixed bottom-0 inset-x-0 z-40 pb-safe lg:hidden"
+      style={{
+        background: "rgba(255,255,255,0.92)",
+        backdropFilter: "blur(20px)",
+        WebkitBackdropFilter: "blur(20px)",
+        borderTop: "1px solid rgba(193,207,216,0.6)",
+        boxShadow: "0 -4px 24px rgba(15,31,46,0.07)",
+      }}
+    >
+      <div className="flex h-[60px] items-stretch px-1 max-w-lg mx-auto">
+        {items.map((item) => {
+          const active =
+            pathname === item.path ||
+            (item.path !== dashPath && pathname.startsWith(item.path));
           return (
             <Link
               key={item.path}
               href={item.path}
-              className={`flex flex-col items-center justify-center flex-1 h-full py-1 transition-all active:scale-95 duration-150 ${
-                isActive
-                  ? "text-[#1d524d] font-bold"
-                  : "text-[#6c838a] hover:text-[#1d524d]"
-              }`}
+              className={`
+                flex flex-col items-center justify-center flex-1 gap-0.5
+                transition-all duration-150 active:scale-90
+                ${active ? "text-[#1a4a5e]" : "text-[#8199a9] hover:text-[#1a4a5e]"}
+              `}
             >
-              <div className={`flex items-center justify-center w-10 h-7 rounded-full transition-all ${isActive ? "bg-[#dcece7]" : ""}`}>
-                <span className={`material-symbols-outlined text-[21px] ${isActive ? "text-[#174844]" : ""}`}>
+              <div
+                className={`
+                  flex items-center justify-center w-11 h-7 rounded-full transition-all duration-150
+                  ${active ? "bg-[#cce5f0]" : ""}
+                `}
+              >
+                <span
+                  className={`material-symbols-outlined transition-all ${
+                    active
+                      ? "text-[20px] font-black text-[#1a4a5e]"
+                      : "text-[20px]"
+                  }`}
+                  style={active ? { fontVariationSettings: "'FILL' 1" } : {}}
+                >
                   {item.icon}
                 </span>
               </div>
-              <span className="text-[10px] font-medium tracking-tight mt-0.5">{item.name}</span>
+              <span className={`text-[9.5px] font-semibold tracking-tight leading-none ${active ? "text-[#1a4a5e]" : ""}`}>
+                {item.name}
+              </span>
             </Link>
           );
         })}

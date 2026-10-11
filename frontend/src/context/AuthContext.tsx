@@ -9,9 +9,11 @@ import {
   signOut,
   onAuthStateChanged,
   updateProfile,
+  sendEmailVerification,
+  sendPasswordResetEmail,
 } from "firebase/auth";
 import { auth, googleProvider } from "@/lib/firebase";
-import { saveUserProfile, getUserProfile, UserProfileData } from "@/lib/firestore";
+import { saveUserProfile, getUserProfile, UserProfileData, createRegistration, syncEmailVerification } from "@/lib/firestore";
 import { saveProfileToBackend } from "@/lib/api";
 
 interface AuthContextType {
@@ -19,7 +21,7 @@ interface AuthContextType {
   userProfile: UserProfileData | null;
   loading: boolean;
   loginWithEmail: (email: string, pass: string) => Promise<void>;
-  registerWithEmail: (email: string, pass: string, name: string, role?: "student" | "alumni") => Promise<void>;
+  registerWithEmail: (email: string, pass: string, name: string, role: "student" | "alumni", registration?: Record<string, string | undefined>) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   updateUserProfilePhoto: (photoURL: string) => Promise<void>;
@@ -27,6 +29,8 @@ interface AuthContextType {
   refreshUserProfile: () => Promise<void>;
   error: string | null;
   clearError: () => void;
+  resendVerification: () => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -55,18 +59,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const fetchAndSyncProfile = async (currentUser: User) => {
     try {
       let existing = await getUserProfile(currentUser.uid);
-      if (!existing) {
-        const defaultRole = (currentUser.email || "").toLowerCase().includes("admin") ? "admin" : "student";
-        existing = {
-          uid: currentUser.uid,
-          email: currentUser.email || "",
-          displayName: currentUser.displayName || currentUser.email?.split("@")[0] || "User",
-          photoURL: currentUser.photoURL || "",
-          role: defaultRole,
-        };
-        try {
-          await saveUserProfile(existing);
-        } catch {}
+      if (!existing) return;
+      if (existing.emailVerified !== currentUser.emailVerified) {
+        existing.emailVerified = currentUser.emailVerified;
+        await syncEmailVerification(currentUser.uid, currentUser.emailVerified);
       }
 
       if (!existing.photoURL && currentUser.photoURL) {
@@ -153,19 +149,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const res = await signInWithEmailAndPassword(auth, email, pass);
       if (res.user) {
-        let existingProfile = await getUserProfile(res.user.uid);
-        if (!existingProfile) {
-          const defaultRole = email.toLowerCase().includes("admin") ? "admin" : "student";
-          existingProfile = {
-            uid: res.user.uid,
-            email: res.user.email || email,
-            displayName: res.user.displayName || email.split("@")[0],
-            photoURL: res.user.photoURL || "",
-            role: defaultRole,
-          };
-          try {
-            await saveUserProfile(existingProfile);
-          } catch {}
+        const existingProfile = await getUserProfile(res.user.uid);
+        if (!existingProfile) throw new Error("Registration record not found.");
+        if (existingProfile.role !== "admin" && !res.user.emailVerified) {
+          await signOut(auth);
+          throw new Error("Please verify your email before signing in.");
+        }
+        if (existingProfile.role !== "admin" && existingProfile.status !== "APPROVED") {
+          await signOut(auth);
+          throw new Error(existingProfile.status === "REJECTED" ? "Your registration was rejected." : "Your registration is awaiting admin approval.");
         }
         try {
           await saveProfileToBackend(existingProfile);
@@ -188,7 +180,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const registerWithEmail = async (email: string, pass: string, name: string, role: "student" | "alumni" = "student") => {
+  const registerWithEmail = async (email: string, pass: string, name: string, role: "student" | "alumni", registration: Record<string, string | undefined> = {}) => {
     setError(null);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
@@ -196,17 +188,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (name) {
           await updateProfile(userCredential.user, { displayName: name });
         }
+        await sendEmailVerification(userCredential.user);
         const newProfile: UserProfileData = {
           uid: userCredential.user.uid,
           email: email,
           displayName: name || email.split("@")[0],
           photoURL: "",
           role: role,
+          status: "PENDING",
+          emailVerified: false,
+          registration,
         };
-        await saveUserProfile(newProfile);
-        try {
-          await saveProfileToBackend(newProfile);
-        } catch {}
+        await createRegistration({ ...newProfile, status: "PENDING" });
         setUserProfile(newProfile);
       }
     } catch (err: unknown) {
@@ -222,6 +215,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       throw err;
     }
+  };
+
+  const resendVerification = async () => {
+    if (!auth.currentUser) throw new Error("No authenticated user");
+    await sendEmailVerification(auth.currentUser);
+  };
+
+  const resetPassword = async (email: string) => {
+    await sendPasswordResetEmail(auth, email);
   };
 
   const loginWithGoogle = async () => {
@@ -291,6 +293,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         refreshUserProfile,
         error,
         clearError,
+        resendVerification,
+        resetPassword,
       }}
     >
       {children}

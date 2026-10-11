@@ -80,14 +80,14 @@
     "RscIvWqmbdgK4wpmCNktCdJjwUn2": {
       "uid": "RscIvWqmbdgK4wpmCNktCdJjwUn2",
       "email": "patelhenishkumar1@gmail.com",
-      "displayName": "Patel Henish",
+      "displayName": "patelhenishkumar1",
       "role": "student",
-      "classYear": "2027",
-      "department": "Computer Engineering",
+      "classYear": "",
+      "department": "",
       "company": "",
       "photoURL": "",
-      "bio": "A1",
-      "updatedAt": "2026-10-06T20:36:19.657Z"
+      "bio": "",
+      "updatedAt": "2026-10-09T06:38:55.039Z"
     },
     "mUanj93EfwO2L0uLufrhrXXhKyG3": {
       "uid": "mUanj93EfwO2L0uLufrhrXXhKyG3",
@@ -128,6 +128,30 @@
       "photoURL": "",
       "bio": "",
       "updatedAt": "2026-10-08T19:42:46.229Z"
+    },
+    "cwpjCJYunDMETnCfNAYnZbwAXe43": {
+      "uid": "cwpjCJYunDMETnCfNAYnZbwAXe43",
+      "email": "patel@gmail.com",
+      "displayName": "nicky",
+      "role": "student",
+      "photoURL": "",
+      "updatedAt": "2026-10-09T07:02:37.227Z"
+    },
+    "BbmI3jQXoNZjUAihW1KRv6gyydD3": {
+      "uid": "BbmI3jQXoNZjUAihW1KRv6gyydD3",
+      "email": "test1@gmail.com",
+      "displayName": "nicky",
+      "role": "student",
+      "photoURL": "http://localhost:5000/uploads/avatar-1791531865273-311935632.jpg",
+      "updatedAt": "2026-10-09T07:44:27.725Z"
+    },
+    "MHMdj5ksQ4Yxj5l9atWlRYiZXEO2": {
+      "uid": "MHMdj5ksQ4Yxj5l9atWlRYiZXEO2",
+      "email": "alu1@gmail.com",
+      "displayName": "alu",
+      "role": "alumni",
+      "photoURL": "",
+      "updatedAt": "2026-10-09T07:49:48.067Z"
     }
   },
   "applications": [
@@ -200,6 +224,40 @@
       "status": "Rejected",
       "createdAt": "2026-10-07T15:12:09.700Z",
       "updatedAt": "2026-10-07T16:34:52.002Z"
+    },
+    {
+      "id": "app-1791529405917",
+      "jobId": "job-1791315306333",
+      "jobTitle": "Full Stack Intern",
+      "company": "TCS",
+      "posterId": "",
+      "posterEmail": "",
+      "applicantId": "cwpjCJYunDMETnCfNAYnZbwAXe43",
+      "applicantName": "nicky",
+      "applicantEmail": "patel@gmail.com",
+      "applicantRole": "student",
+      "resumeName": "Tunnel.pdf",
+      "coverLetter": "",
+      "appliedDate": "Oct 9, 2026",
+      "status": "Under Review",
+      "createdAt": "2026-10-09T07:03:25.975Z"
+    },
+    {
+      "id": "app-1791529501869",
+      "jobId": "job-1791315306333",
+      "jobTitle": "Full Stack Intern",
+      "company": "TCS",
+      "posterId": "",
+      "posterEmail": "",
+      "applicantId": "cwpjCJYunDMETnCfNAYnZbwAXe43",
+      "applicantName": "nicky",
+      "applicantEmail": "patel@gmail.com",
+      "applicantRole": "student",
+      "resumeName": "Student_Alumni_Portal_SRS.docx",
+      "coverLetter": "poiuytresx",
+      "appliedDate": "Oct 9, 2026",
+      "status": "Under Review",
+      "createdAt": "2026-10-09T07:05:01.869Z"
     }
   ]
 }

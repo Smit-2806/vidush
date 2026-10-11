@@ -101,166 +101,141 @@ export default function EventsPage() {
 
   return (
     <LayoutWrapper>
-      <div className="mx-auto w-full max-w-[1440px] space-y-7">
-        <header className="flex flex-col justify-between gap-5 border-b border-[#d9e2e3] pb-6 md:flex-row md:items-end">
-          <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#54766f]">Community <span className="px-1.5 text-[#a1b2b0]">/</span> Calendar</p>
-            <h1 className="mt-2 font-sans text-3xl font-semibold tracking-tight text-[#142f38] sm:text-4xl">University events</h1>
-            <p className="mt-2 text-sm text-[#63777d]">Find gatherings, workshops, and community events.</p>
+      <div className="mx-auto w-full max-w-[1440px] space-y-6">
+        {/* Hero header */}
+        <header className="relative overflow-hidden rounded-2xl p-6 sm:p-8"
+                style={{ background: "linear-gradient(135deg, #0d2233 0%, #1a4a5e 100%)" }}>
+          <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full opacity-10 pointer-events-none"
+               style={{ background: "radial-gradient(circle, #60c4e8 0%, transparent 70%)" }} />
+          <div className="relative z-10 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-[10.5px] font-bold uppercase tracking-[0.20em] text-white/45 mb-2">
+                Community <span className="text-white/25 mx-1">/</span> Calendar
+              </p>
+              <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1"
+                  style={{ fontFamily: "Poppins, system-ui, sans-serif", letterSpacing: "-0.025em" }}>
+                University Events
+              </h1>
+              <p className="text-sm text-white/55">Discover gatherings, workshops, and alumni community events.</p>
+            </div>
+            {isAdmin && (
+              <button
+                onClick={() => setIsModalOpen(true)}
+                className="inline-flex min-h-[44px] shrink-0 items-center gap-2 rounded-xl px-5 text-sm font-semibold cursor-pointer"
+                style={{ background: "#60c4e8", color: "#0d2233" }}
+              >
+                <span className="material-symbols-outlined text-[20px]">add</span>
+                Host an Event
+              </button>
+            )}
           </div>
-          {isAdmin && (
-            <button
-              onClick={() => setIsModalOpen(true)}
-              className="inline-flex min-h-11 items-center gap-2 self-start rounded-md bg-[#173c42] px-4 text-sm font-semibold text-white transition hover:bg-[#21525a] md:self-auto"
-            >
-              <span className="material-symbols-outlined text-[20px]">add</span>
-              Host an Event
-            </button>
-          )}
         </header>
 
-        <section aria-label="Event filters" className="flex flex-wrap items-center justify-between gap-3 border-b border-[#d9e2e3] pb-4">
-          <div className="flex gap-5" role="group" aria-label="Filter events">
-            {(["live", "completed", "all"] as const).map((filter) => <button key={filter} type="button" onClick={() => setEventFilter(filter)} aria-pressed={eventFilter === filter} className={`border-b-2 pb-2 text-sm font-semibold capitalize transition ${eventFilter === filter ? "border-[#24635d] text-[#205b55]" : "border-transparent text-[#788a8e] hover:text-[#24444b]"}`}>{filter === "live" ? `Live & upcoming (${liveEvents.length})` : filter === "completed" ? `Completed (${completedEvents.length})` : "All events"}</button>)}
-          </div>
-          <span className="text-xs text-[#849398]">{visibleEvents.length} events</span>
-        </section>
-
-        {visibleEvents.length ? (
-          <div className="divide-y divide-[#dfe7e7] border-b border-[#d9e2e3]">
-            {visibleEvents.map((event) => (
-              <article key={event.id} className="grid gap-4 py-5 sm:grid-cols-[72px_minmax(0,1fr)_auto] sm:items-center">
-                <div className="flex h-[68px] w-[68px] flex-col items-center justify-center rounded-md bg-[#e4efeb] text-[#255852]">
-                  <span className="text-[10px] font-bold uppercase tracking-wide">{event.month}</span>
-                  <span className="mt-0.5 text-2xl font-semibold leading-none">{event.day}</span>
-                </div>
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2"><h2 className="text-base font-semibold text-[#17343b]">{event.title}</h2><span className={`text-[10px] font-bold uppercase tracking-wider ${isEventCompleted(event) ? "text-[#879599]" : "text-[#287359]"}`}>{isEventCompleted(event) ? "Completed" : "Upcoming"}</span></div>
-                  <p className="mt-1 flex items-center gap-1.5 text-xs text-[#718287]"><span className="material-symbols-outlined text-[15px]">{event.isVirtual ? "videocam" : "location_on"}</span>{event.location}</p>
-                  {event.description && <p className="mt-2 max-w-3xl text-sm leading-relaxed text-[#63777d]">{event.description}</p>}
-                </div>
-                <button type="button" onClick={() => { void navigator.clipboard?.writeText(`${event.title} - ${event.month} ${event.day} at ${event.location}`); }} aria-label={`Copy details for ${event.title}`} title="Copy event details" className="flex h-10 w-10 items-center justify-center rounded-md text-[#517078] transition hover:bg-[#e4efeb] hover:text-[#205b55]">
-                  <span className="material-symbols-outlined text-[19px]">content_copy</span>
-                </button>
-              </article>
+        {/* Filter tabs */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex gap-1 p-1 rounded-xl" style={{ background: "#e8edf2" }} role="group">
+            {(["live", "completed", "all"] as const).map((filter) => (
+              <button key={filter} type="button" onClick={() => setEventFilter(filter)} aria-pressed={eventFilter === filter}
+                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                  eventFilter === filter ? "bg-white text-[#1a4a5e] shadow-sm" : "text-[#4a6072] hover:text-[#1a4a5e]"
+                }`}>
+                {filter === "live" ? `Upcoming (${liveEvents.length})` : filter === "completed" ? `Completed (${completedEvents.length})` : "All"}
+              </button>
             ))}
           </div>
+          <span className="text-xs font-medium text-[#8199a9]">{visibleEvents.length} event{visibleEvents.length !== 1 ? "s" : ""}</span>
+        </div>
+
+        {/* Events list */}
+        {isLoading ? (
+          <div className="flex items-center justify-center py-16 gap-3 text-[#4a6072]">
+            <div className="spinner" /><span className="text-sm">Loading events…</span>
+          </div>
+        ) : visibleEvents.length ? (
+          <div className="space-y-3">
+            {visibleEvents.map((event) => {
+              const completed = isEventCompleted(event);
+              return (
+                <article key={event.id} className="card p-5 flex flex-col gap-4 sm:flex-row sm:items-center">
+                  <div className="flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-xl text-center"
+                       style={{ background: completed ? "#e8edf2" : "#cce5f0" }}>
+                    <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: completed ? "#8199a9" : "#1a4a5e" }}>{event.month}</span>
+                    <span className="mt-0.5 text-2xl font-bold leading-none" style={{ color: completed ? "#4a6072" : "#0d2233", fontFamily: "Poppins, system-ui, sans-serif" }}>{event.day}</span>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                      <h2 className="text-base font-bold text-[#0f1f2e]" style={{ fontFamily: "Poppins, system-ui, sans-serif" }}>{event.title}</h2>
+                      <span className={`badge ${completed ? "badge-neutral" : "badge-primary"}`}>{completed ? "Completed" : "Upcoming"}</span>
+                      {event.isVirtual && <span className="badge" style={{ background: "#e0e7ff", color: "#4338ca", border: "1px solid #c7d2fe" }}>Virtual</span>}
+                    </div>
+                    <p className="flex items-center gap-1.5 text-xs text-[#8199a9] mb-1">
+                      <span className="material-symbols-outlined text-[14px]">{event.isVirtual ? "videocam" : "location_on"}</span>{event.location}
+                    </p>
+                    {event.description && <p className="text-sm leading-relaxed text-[#4a6072] max-w-2xl">{event.description}</p>}
+                  </div>
+                  <button type="button" onClick={() => void navigator.clipboard?.writeText(`${event.title} - ${event.month} ${event.day} at ${event.location}`)}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[#8199a9] hover:bg-[#cce5f0] hover:text-[#1a4a5e] cursor-pointer transition-colors">
+                    <span className="material-symbols-outlined text-[19px]">content_copy</span>
+                  </button>
+                </article>
+              );
+            })}
+          </div>
         ) : (
-          <div className="border-y border-dashed border-[#cbd8d9] py-16 text-center"><span className="material-symbols-outlined text-3xl text-[#829398]">event_busy</span><p className="mt-2 text-sm font-semibold text-[#29474e]">{isLoading ? "Loading events…" : "No events in this view"}</p><p className="mt-1 text-xs text-[#819095]">Try another filter or check back later.</p></div>
+          <div className="card flex flex-col items-center justify-center py-16 text-center">
+            <span className="material-symbols-outlined text-[48px] text-[#c2cfd8] mb-3">event_busy</span>
+            <p className="text-base font-bold text-[#0f1f2e] mb-1" style={{ fontFamily: "Poppins, system-ui, sans-serif" }}>No events here</p>
+            <p className="text-sm text-[#8199a9]">Try another filter or check back soon.</p>
+          </div>
         )}
 
-        {/* Create Event Modal - Admin Only */}
+        {/* Create Event Modal */}
         {isModalOpen && isAdmin && (
-          <div className="fixed inset-0 z-50 bg-on-surface/40 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-surface-container-lowest rounded-2xl max-w-md w-full p-6 shadow-xl border border-surface-container max-h-[90vh] overflow-y-auto">
-              <div className="flex items-center justify-between pb-3 border-b border-surface-container mb-4">
-                <h2 className="font-headline-md text-on-surface font-bold">Host a New Event</h2>
-                <button
-                  onClick={() => setIsModalOpen(false)}
-                  className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-surface-container cursor-pointer text-on-surface-variant"
-                >
-                  <span className="material-symbols-outlined text-[18px]">close</span>
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+               style={{ background: "rgba(13,34,51,0.65)", backdropFilter: "blur(8px)" }}>
+            <div className="w-full max-w-md rounded-2xl max-h-[90vh] overflow-y-auto animate-scale-in"
+                 style={{ background: "#ffffff", boxShadow: "0 24px 64px rgba(0,0,0,0.30)" }}>
+              <div className="flex items-center justify-between p-6 pb-4" style={{ borderBottom: "1px solid #e1e8ee" }}>
+                <h2 className="text-lg font-bold text-[#0f1f2e]" style={{ fontFamily: "Poppins, system-ui, sans-serif" }}>Host a New Event</h2>
+                <button onClick={() => setIsModalOpen(false)}
+                        className="flex h-9 w-9 items-center justify-center rounded-xl text-[#8199a9] hover:bg-[#f1f5f9] cursor-pointer transition-colors">
+                  <span className="material-symbols-outlined text-[20px]">close</span>
                 </button>
               </div>
-
-              <form onSubmit={handleCreateEvent} className="flex flex-col gap-4">
+              <form onSubmit={handleCreateEvent} className="flex flex-col gap-4 p-6">
+                {[
+                  { label: "Event Title *", type: "text", value: title, fn: setTitle, ph: "e.g. Annual Alumni Meetup 2026", req: true },
+                  { label: "Location / Venue *", type: "text", value: location, fn: setLocation, ph: "e.g. Auditorium Hall or Zoom", req: true },
+                ].map((f) => (
+                  <div key={f.label}>
+                    <label className="block text-xs font-semibold text-[#1e3a4a] mb-1.5">{f.label}</label>
+                    <input type={f.type} required={f.req} placeholder={f.ph} value={f.value}
+                      onChange={(e) => f.fn(e.target.value)}
+                      className="w-full h-11 px-4 rounded-xl border border-[#dde5eb] bg-[#f8fafc] text-sm text-[#0f1f2e] focus:border-[#1a4a5e] focus:ring-2 focus:ring-[#1a4a5e]/10 focus:outline-none transition-all" />
+                  </div>
+                ))}
                 <div>
-                  <label className="font-label-md text-on-surface block mb-1 text-xs font-semibold">
-                    Event Title *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Annual Alumni Meetup 2026"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-lg bg-surface-container-low border border-surface-container text-on-surface text-sm outline-none focus:ring-2 focus:ring-primary"
-                  />
+                  <label className="block text-xs font-semibold text-[#1e3a4a] mb-1.5">Event Date *</label>
+                  <input type="date" required min={new Date().toISOString().slice(0,10)} value={date} onChange={(e) => setDate(e.target.value)}
+                    className="w-full h-11 px-4 rounded-xl border border-[#dde5eb] bg-[#f8fafc] text-sm text-[#0f1f2e] focus:border-[#1a4a5e] focus:ring-2 focus:ring-[#1a4a5e]/10 focus:outline-none transition-all" />
                 </div>
-
                 <div>
-                  <label className="font-label-md text-on-surface block mb-1 text-xs font-semibold">
-                    Event Date *
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    min={new Date().toISOString().slice(0, 10)}
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-lg bg-surface-container-low border border-surface-container text-on-surface text-sm outline-none focus:ring-2 focus:ring-primary"
-                  />
+                  <label className="block text-xs font-semibold text-[#1e3a4a] mb-1.5">Description</label>
+                  <textarea rows={3} maxLength={500} placeholder="What will attendees experience?" value={description} onChange={(e) => setDescription(e.target.value)}
+                    className="w-full resize-y px-4 py-3 rounded-xl border border-[#dde5eb] bg-[#f8fafc] text-sm text-[#0f1f2e] focus:border-[#1a4a5e] focus:ring-2 focus:ring-[#1a4a5e]/10 focus:outline-none transition-all" />
                 </div>
-
                 <div>
-                  <label className="font-label-md text-on-surface block mb-1 text-xs font-semibold">
-                    Location / Venue *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Auditorium Hall or Virtual / Zoom"
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-lg bg-surface-container-low border border-surface-container text-on-surface text-sm outline-none focus:ring-2 focus:ring-primary"
-                  />
+                  <label className="block text-xs font-semibold text-[#1e3a4a] mb-1.5">Banner Image URL (optional)</label>
+                  <input type="url" placeholder="https://…" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)}
+                    className="w-full h-11 px-4 rounded-xl border border-[#dde5eb] bg-[#f8fafc] text-sm text-[#0f1f2e] focus:border-[#1a4a5e] focus:outline-none transition-all" />
                 </div>
-
-                <div>
-                  <label className="font-label-md text-on-surface block mb-1 text-xs font-semibold">
-                    Event Description
-                  </label>
-                  <textarea
-                    rows={3}
-                    maxLength={500}
-                    placeholder="What will attendees learn or do?"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    className="w-full resize-y px-3.5 py-2.5 rounded-lg bg-surface-container-low border border-surface-container text-on-surface text-sm outline-none focus:ring-2 focus:ring-primary"
-                  />
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="isVirtual"
-                    checked={isVirtual}
-                    onChange={(e) => setIsVirtual(e.target.checked)}
-                    className="w-4 h-4 rounded text-primary focus:ring-primary"
-                  />
-                  <label htmlFor="isVirtual" className="font-body-sm text-on-surface text-xs font-semibold cursor-pointer">
-                    This is an online / virtual event
-                  </label>
-                </div>
-
-                <div>
-                  <label className="font-label-md text-on-surface block mb-1 text-xs font-semibold">
-                    Banner Image URL (optional)
-                  </label>
-                  <input
-                    type="url"
-                    placeholder="https://example.com/banner.jpg"
-                    value={imageUrl}
-                    onChange={(e) => setImageUrl(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-lg bg-surface-container-low border border-surface-container text-on-surface text-sm outline-none focus:ring-2 focus:ring-primary"
-                  />
-                </div>
-
-                <div className="flex gap-3 justify-end mt-2 pt-2 border-t border-surface-container">
-                  <button
-                    type="button"
-                    onClick={() => setIsModalOpen(false)}
-                    className="px-4 py-2 rounded-lg font-label-md text-on-surface hover:bg-surface-container cursor-pointer text-xs"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isSaving}
-                    className="px-5 py-2 rounded-lg font-label-md bg-primary text-on-primary hover:bg-primary/90 font-bold cursor-pointer text-xs disabled:opacity-50"
-                  >
-                    {isSaving ? "Creating..." : "Create Event"}
-                  </button>
+                <label className="flex cursor-pointer items-center gap-2 text-xs font-semibold text-[#1e3a4a]">
+                  <input type="checkbox" checked={isVirtual} onChange={(e) => setIsVirtual(e.target.checked)} className="h-4 w-4 rounded accent-[#1a4a5e]" />
+                  This is a virtual / online event
+                </label>
+                <div className="flex gap-2.5 pt-3" style={{ borderTop: "1px solid #e1e8ee" }}>
+                  <button type="button" onClick={() => setIsModalOpen(false)} className="btn btn-secondary flex-1 text-xs">Cancel</button>
+                  <button type="submit" disabled={isSaving} className="btn btn-primary flex-1 text-xs disabled:opacity-50">{isSaving ? "Creating…" : "Create Event"}</button>
                 </div>
               </form>
             </div>
